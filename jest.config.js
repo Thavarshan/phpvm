@@ -5,6 +5,7 @@
 
 /** @type {import('jest').Config} */
 const config = {
+  silent: false,
   automock: false,
   clearMocks: true,
   verbose: true,
