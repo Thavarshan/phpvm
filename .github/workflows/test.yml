@@ -52,7 +52,7 @@ jobs:
       # Run the PHP version manager
       - name: Run PHP Version Manager Install (Download Test)
         run: |
-          node ./path-to-your-script/install.js 7.4.10
+          node ./lib/commands/install.js 7.4.10
 
       # Check if PHP is installed and verify its version
       - name: Verify PHP Installation
@@ -62,7 +62,7 @@ jobs:
       # Simulate failed download and fallback to package manager
       - name: Simulate Failed Download and Fallback
         run: |
-          node ./path-to-your-script/install.js non-existent-version
+          node ./lib/commands/install.js non-existent-version
         continue-on-error: true
 
       # Verify PHP Version Manager fallback handling
