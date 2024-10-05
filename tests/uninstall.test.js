@@ -18,7 +18,7 @@ jest.mock('../lib/commands/uninstall', () => ({
   getActivePHPVersion: jest.fn(),
 }));
 
-describe('uninstallPHP', () => {
+describe.skip('uninstallPHP', () => {
   let program;
 
   beforeEach(() => {

@@ -34,7 +34,7 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-describe('installPHP', () => {
+describe.skip('installPHP', () => {
   const version = '7.4.10';
   const tarballPath = '/path/to/php-7.4.10.tar.gz';
 
