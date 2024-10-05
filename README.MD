@@ -69,11 +69,11 @@ To **install** or **update** phpvm, run the following command using either `curl
 
 ```sh
 
-curl -o- https://raw.githubusercontent.com/Thavarshan/phpvm/v0.0.1/bin/install.sh | bash
+curl -o- https://raw.githubusercontent.com/Thavarshan/phpvm/0.0.1/bin/install.sh | bash
 ```
 
 ```sh
-wget -qO- https://raw.githubusercontent.com/Thavarshan/phpvm/v0.0.1/bin/install | bash
+wget -qO- https://raw.githubusercontent.com/Thavarshan/phpvm/0.0.1/bin/install | bash
 ```
 
 This script clones the `phpvm` repository into `~/.phpvm` and attempts to add the following lines to your profile (`~/.bashrc`, `~/.zshrc`, or `~/.profile`):
