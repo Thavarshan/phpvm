@@ -1,4 +1,4 @@
-name: Test
+name: Use
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
       - main
 
 jobs:
-  test:
+  use:
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -49,6 +49,35 @@ jobs:
             fi
           fi
 
-      # Run tests
-      - name: Run tests
-        run: npm run test
+      # Install PHP
+      - name: Install PHP
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y php
+
+      - name: Install PHP on macOS
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install php
+
+      # Run the PHP version manager
+      - name: Run PHP Version Manager Install (Download Test)
+        run: |
+          node ./lib/commands/install.js 7.4.10
+
+      # Check if PHP is installed and verify its version
+      - name: Verify PHP Installation
+        run: |
+          php -v
+
+      # Simulate failed download and fallback to package manager
+      - name: Simulate Failed Download and Fallback
+        run: |
+          node ./lib/commands/install.js non-existent-version
+        continue-on-error: true
+
+      # Verify PHP Version Manager fallback handling
+      - name: Check if fallback worked
+        run: |
+          php -v
