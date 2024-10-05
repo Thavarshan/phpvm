@@ -31,7 +31,7 @@ jest.mock('path', () => ({
   resolve: jest.fn(),
 }));
 
-describe.skip('installPHP', () => {
+describe('installPHP', () => {
   const version = '7.4.10';
   const tarballPath = '/path/to/php-7.4.10.tar.gz';
   const platform = 'macos-apple-silicon';
