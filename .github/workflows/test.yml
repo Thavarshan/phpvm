@@ -49,6 +49,18 @@ jobs:
             fi
           fi
 
+      # Install PHP
+      - name: Install PHP
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y php
+
+      - name: Install PHP on macOS
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install php
+
       # Run the PHP version manager
       - name: Run PHP Version Manager Install (Download Test)
         run: |
