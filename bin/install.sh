@@ -61,7 +61,7 @@
         else
             phpvm_echo "=> Downloading phpvm from git to '$INSTALL_DIR'"
             mkdir -p "${INSTALL_DIR}"
-            command git clone "https://github.com/your-username/phpvm.git" --depth=1 "${INSTALL_DIR}" || {
+            command git clone "https://github.com/Thavarshan/phpvm.git" --depth=1 "${INSTALL_DIR}" || {
                 phpvm_echo >&2 'Failed to clone phpvm repo. Please report this!'
                 exit 1
             }
