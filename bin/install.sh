@@ -27,7 +27,7 @@
     }
 
     phpvm_latest_version() {
-        phpvm_echo "v1.0.0" # replace with your current phpvm version
+        phpvm_echo "0.0.1" # replace with your current phpvm version
     }
 
     phpvm_download() {
@@ -83,7 +83,7 @@
         local INSTALL_DIR
         INSTALL_DIR="$(phpvm_install_dir)"
         local PHPVM_SOURCE
-        PHPVM_SOURCE="https://raw.githubusercontent.com/your-username/phpvm/main/index.js"
+        PHPVM_SOURCE="https://raw.githubusercontent.com/Thavarshan/phpvm/main/index.js"
 
         phpvm_echo "=> Downloading phpvm as a script to '$INSTALL_DIR'"
         mkdir -p "$INSTALL_DIR"
