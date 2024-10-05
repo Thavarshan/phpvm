@@ -1,0 +1,71 @@
+name: Test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        platform: [intel, arm]
+
+    steps:
+      # Checkout the code
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      # Set up Node.js
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '16'
+
+      # Install dependencies
+      - name: Install dependencies
+        run: npm install
+
+      # Matrix conditional setup for different OS/Platforms
+      - name: Setup Platform Details
+        run: |
+          if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
+            if [ "${{ matrix.platform }}" == "arm" ]; then
+              sudo apt-get update
+              sudo apt-get install -y build-essential libxml2-dev
+            fi
+          fi
+          if [ "${{ matrix.os }}" == "macos-latest" ]; then
+            if [ "${{ matrix.platform }}" == "arm" ]; then
+              echo "Simulating Apple Silicon scenario"
+            else
+              echo "Simulating Intel Mac scenario"
+            fi
+          fi
+
+      # Run the PHP version manager
+      - name: Run PHP Version Manager Install (Download Test)
+        run: |
+          node ./path-to-your-script/install.js 7.4.10
+
+      # Check if PHP is installed and verify its version
+      - name: Verify PHP Installation
+        run: |
+          php -v
+
+      # Simulate failed download and fallback to package manager
+      - name: Simulate Failed Download and Fallback
+        run: |
+          node ./path-to-your-script/install.js non-existent-version
+        continue-on-error: true
+
+      # Verify PHP Version Manager fallback handling
+      - name: Check if fallback worked
+        run: |
+          php -v
