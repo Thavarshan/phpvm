@@ -9,7 +9,11 @@ const {
   getActivePHPVersion,
   isLocalBinInPath,
 } = require('../lib/commands/use');
-const { getPlatformDetails, getLinuxDistro } = require('../lib/utils/platform');
+const {
+  getPlatformDetails,
+  getLinuxDistro,
+  setPlatformDetails,
+} = require('../lib/utils/platform');
 
 jest.mock('fs');
 jest.mock('path');
@@ -24,6 +28,10 @@ describe('usePHPVersion', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     console.log = jest.fn();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   it('should switch to PHP version installed by phpvm', () => {
@@ -75,8 +83,10 @@ describe('usePHPVersion', () => {
   });
 
   it('should handle unsupported platforms', () => {
+    jest.clearAllMocks();
     const version = '7.4.10';
-    getPlatformDetails.mockReturnValue('unsupported');
+    setPlatformDetails('unsupported', 'unsupported');
+    // getPlatformDetails.mockReturnValue('unsupported');
     path.resolve.mockReturnValue('/home/user/.phpvm/versions/7.4.10');
     fs.existsSync.mockReturnValue(false);
 
