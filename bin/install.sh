@@ -26,7 +26,7 @@
         # Fetch the latest version from GitHub
         latest_version=$(curl -s https://api.github.com/repos/Thavarshan/phpvm/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
 
-        # If we can't fetch the version, default to 'main' but only return the version string, no echoing messages here
+        # If we can't fetch the version, default to 'main'
         if [ -z "$latest_version" ]; then
             latest_version="main" # Default to the main branch version
         fi
@@ -84,6 +84,34 @@
             phpvm_echo >&2 'Failed to install Node.js dependencies. Please report this!'
             exit 1
         }
+    }
+
+    phpvm_detect_profile() {
+        if [ "${PROFILE-}" = '/dev/null' ]; then
+            return
+        fi
+
+        if [ -n "${PROFILE}" ] && [ -f "${PROFILE}" ]; then
+            phpvm_echo "${PROFILE}"
+            return
+        fi
+
+        local SHELL_TYPE
+        SHELL_TYPE="$(basename "$SHELL")"
+
+        if [ "$SHELL_TYPE" = "bash" ]; then
+            if [ -f "$HOME/.bashrc" ]; then
+                phpvm_echo "$HOME/.bashrc"
+            elif [ -f "$HOME/.bash_profile" ]; then
+                phpvm_echo "$HOME/.bash_profile"
+            fi
+        elif [ "$SHELL_TYPE" = "zsh" ]; then
+            if [ -f "$HOME/.zshrc" ]; then
+                phpvm_echo "$HOME/.zshrc"
+            elif [ -f "$HOME/.zprofile" ]; then
+                phpvm_echo "$HOME/.zprofile"
+            fi
+        fi
     }
 
     inject_phpvm_auto_switch() {
