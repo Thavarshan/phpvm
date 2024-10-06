@@ -84,41 +84,6 @@
             phpvm_echo >&2 'Failed to install Node.js dependencies. Please report this!'
             exit 1
         }
-
-        # Make the phpvm binary executable
-        phpvm_echo "=> Making phpvm binary executable"
-        chmod +x "$INSTALL_DIR/bin/phpvm" || {
-            phpvm_echo >&2 'Failed to set execute permissions on phpvm binary. Please report this!'
-            exit 1
-        }
-    }
-
-    phpvm_detect_profile() {
-        if [ "${PROFILE-}" = '/dev/null' ]; then
-            return
-        fi
-
-        if [ -n "${PROFILE}" ] && [ -f "${PROFILE}" ]; then
-            phpvm_echo "${PROFILE}"
-            return
-        fi
-
-        local SHELL_TYPE
-        SHELL_TYPE="$(basename "$SHELL")"
-
-        if [ "$SHELL_TYPE" = "bash" ]; then
-            if [ -f "$HOME/.bashrc" ]; then
-                phpvm_echo "$HOME/.bashrc"
-            elif [ -f "$HOME/.bash_profile" ]; then
-                phpvm_echo "$HOME/.bash_profile"
-            fi
-        elif [ "$SHELL_TYPE" = "zsh" ]; then
-            if [ -f "$HOME/.zshrc" ]; then
-                phpvm_echo "$HOME/.zshrc"
-            elif [ -f "$HOME/.zprofile" ]; then
-                phpvm_echo "$HOME/.zprofile"
-            fi
-        fi
     }
 
     inject_phpvm_config() {
@@ -128,29 +93,6 @@
         PROFILE_INSTALL_DIR="$(phpvm_install_dir | command sed "s:^$HOME:\$HOME:")"
 
         PHPVM_CONFIG_STR="
-
-# Set up PHPVM environment
-export PHPVM_DIR=\"${PROFILE_INSTALL_DIR}\"
-
-# Only source phpvm if it's needed (for auto-switching versions)
-phpvm_auto_switch_on_cd() {
-    local PHPVMRC_FILE=\"\$(phpvm_find_phpvmrc)\"
-    if [ -n \"\$PHPVMRC_FILE\" ]; then
-        local PHP_VERSION=\$(cat \"\$PHPVMRC_FILE\")
-        if [ -n \"\$PHP_VERSION\" ]; then
-            phpvm use \$PHP_VERSION
-        else
-            echo 'No PHP version specified in .phpvmrc'
-        fi
-    fi
-}
-
-# Update 'cd' command to automatically switch versions based on .phpvmrc
-cd() {
-    builtin cd \"\$@\" || return
-    phpvm_auto_switch_on_cd
-}
-
 # Load PHPVM if necessary (this will allow phpvm to be invoked manually)
 if [ -s \"\$PHPVM_DIR/index.js\" ]; then
     export PATH=\"\$PHPVM_DIR/bin:\$PATH\"
@@ -158,7 +100,7 @@ fi
 "
 
         if [ -n "$PHPVM_PROFILE" ]; then
-            if ! command grep -qc 'phpvm_auto_switch_on_cd' "$PHPVM_PROFILE"; then
+            if ! command grep -qc '/phpvm/index.js' "$PHPVM_PROFILE"; then
                 phpvm_echo "=> Injecting phpvm config into $PHPVM_PROFILE"
                 echo -e "$PHPVM_CONFIG_STR" >>"$PHPVM_PROFILE"
             else
