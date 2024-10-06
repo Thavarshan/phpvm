@@ -2,18 +2,22 @@
 
 { # this ensures the entire script is downloaded #
 
+    # Check if a command exists
     phpvm_has() {
         type "$1" >/dev/null 2>&1
     }
 
+    # Print a message
     phpvm_echo() {
         command printf %s\\n "$*" 2>/dev/null
     }
 
+    # Get the default installation directory
     phpvm_default_install_dir() {
         [ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.phpvm" || printf %s "${XDG_CONFIG_HOME}/phpvm"
     }
 
+    # Get the installation directory
     phpvm_install_dir() {
         if [ -n "$PHPVM_DIR" ]; then
             printf %s "${PHPVM_DIR}"
@@ -22,11 +26,9 @@
         fi
     }
 
+    # Get the latest version from GitHub
     phpvm_latest_version() {
-        # Fetch the latest version from GitHub, fallback to 'main' if no releases
         latest_version=$(curl -s https://api.github.com/repos/Thavarshan/phpvm/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-
-        # Default to 'main' if no release is found
         if [ -z "$latest_version" ]; then
             phpvm_echo "main"
         else
@@ -34,6 +36,7 @@
         fi
     }
 
+    # Install phpvm from git
     install_phpvm_from_git() {
         local INSTALL_DIR
         INSTALL_DIR="$(phpvm_install_dir)"
@@ -78,6 +81,7 @@
         phpvm_create_launcher
     }
 
+    # Create the launcher script
     phpvm_create_launcher() {
         local INSTALL_DIR
         INSTALL_DIR="$(phpvm_install_dir)"
@@ -91,8 +95,23 @@ EOL
 
         # Make the shell script executable
         chmod +x "$INSTALL_DIR/phpvm"
+
+        # Copy the launcher script to a directory in the user's PATH
+        local BIN_DIR="/usr/local/bin"
+        if [ ! -d "$BIN_DIR" ]; then
+            BIN_DIR="$HOME/.local/bin"
+            mkdir -p "$BIN_DIR"
+        fi
+
+        cp "$INSTALL_DIR/phpvm" "$BIN_DIR/phpvm" || {
+            phpvm_echo >&2 "Failed to copy phpvm to $BIN_DIR. Please ensure you have the necessary permissions."
+            exit 1
+        }
+
+        phpvm_echo "=> phpvm has been installed to $BIN_DIR and is now globally available."
     }
 
+    # Detect the user's shell profile
     phpvm_detect_profile() {
         if [ "${PROFILE-}" = '/dev/null' ]; then
             return
@@ -121,6 +140,7 @@ EOL
         fi
     }
 
+    # Inject phpvm configuration into the user's profile
     inject_phpvm_config() {
         local PHPVM_PROFILE
         PHPVM_PROFILE="$(phpvm_detect_profile)"
@@ -145,6 +165,7 @@ export PHPVM_DIR=\"\$HOME/.phpvm\"
         fi
     }
 
+    # Main installation function
     phpvm_do_install() {
         if [ -z "${METHOD}" ]; then
             if phpvm_has git; then
