@@ -114,6 +114,21 @@
         fi
     }
 
+    # Added the phpvm_find_phpvmrc function to find .phpvmrc file
+    phpvm_find_phpvmrc() {
+        local current_dir
+        current_dir="$(pwd)"
+
+        while [ "$current_dir" != "/" ]; do
+            if [ -f "$current_dir/.phpvmrc" ]; then
+                echo "$current_dir/.phpvmrc"
+                return
+            fi
+            current_dir="$(dirname "$current_dir")"
+        done
+        return 1 # Not found
+    }
+
     inject_phpvm_auto_switch() {
         local PHPVM_PROFILE
         PHPVM_PROFILE="$(phpvm_detect_profile)"
