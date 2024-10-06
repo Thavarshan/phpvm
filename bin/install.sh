@@ -10,10 +10,6 @@
         command printf %s\\n "$*" 2>/dev/null
     }
 
-    phpvm_grep() {
-        GREP_OPTIONS='' command grep "$@"
-    }
-
     phpvm_default_install_dir() {
         [ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.phpvm" || printf %s "${XDG_CONFIG_HOME}/phpvm"
     }
@@ -27,11 +23,9 @@
     }
 
     phpvm_latest_version() {
-        # Fetch the latest version from GitHub
-        latest_version=$(curl -s https://api.github.com/repos/Thavarshan/phpvm/releases/latest | grep -oP '"tag_name": "\K(.*)(?=")')
-
-        # Check if the fetch was successful
+        latest_version=$(curl -s https://api.github.com/repos/Thavarshan/phpvm/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
         if [ -z "$latest_version" ]; then
+            phpvm_echo "Unable to fetch the latest version, defaulting to 'main'."
             phpvm_echo "main" # Default to the main branch version
         else
             phpvm_echo "$latest_version"
@@ -42,17 +36,9 @@
         if phpvm_has "curl"; then
             curl --fail --compressed -q "$@"
         elif phpvm_has "wget"; then
-            # Emulate curl with wget
             ARGS=$(phpvm_echo "$@" | command sed -e 's/--progress-bar /--progress=bar /' \
-                -e 's/--compressed //' \
-                -e 's/--fail //' \
-                -e 's/-L //' \
-                -e 's/-I /--server-response /' \
-                -e 's/-s /-q /' \
-                -e 's/-sS /-nv /' \
-                -e 's/-o /-O /' \
-                -e 's/-C - /-c /')
-            # shellcheck disable=SC2086
+                -e 's/--compressed //' -e 's/--fail //' -e 's/-L //' -e 's/-I /--server-response /' \
+                -e 's/-s /-q /' -e 's/-sS /-nv /' -e 's/-o /-O /' -e 's/-C - /-c /')
             eval wget $ARGS
         fi
     }
@@ -85,60 +71,24 @@
             phpvm_echo >&2 'Failed to clean up git repository. Please report this!'
             exit 1
         }
-    }
 
-    install_phpvm_as_script() {
-        local INSTALL_DIR
-        INSTALL_DIR="$(phpvm_install_dir)"
-        local PHPVM_SOURCE
-        PHPVM_SOURCE="https://raw.githubusercontent.com/Thavarshan/phpvm/main/index.js"
+        if ! phpvm_has "node"; then
+            phpvm_echo "Node.js is required to run phpvm. Please install Node.js and try again."
+            exit 1
+        fi
 
-        phpvm_echo "=> Downloading phpvm as a script to '$INSTALL_DIR'"
-        mkdir -p "$INSTALL_DIR"
-        phpvm_download -s "$PHPVM_SOURCE" -o "$INSTALL_DIR/index.js" || {
-            phpvm_echo >&2 "Failed to download '$PHPVM_SOURCE'"
-            return 1
+        phpvm_echo "=> Installing Node.js dependencies"
+        command npm install --prefix "$INSTALL_DIR" || {
+            phpvm_echo >&2 'Failed to install Node.js dependencies. Please report this!'
+            exit 1
         }
-
-        chmod a+x "$INSTALL_DIR/index.js" || {
-            phpvm_echo >&2 "Failed to mark '$INSTALL_DIR/index.js' as executable"
-            return 1
-        }
-    }
-
-    phpvm_detect_profile() {
-        if [ "${PROFILE-}" = '/dev/null' ]; then
-            return
-        fi
-
-        if [ -n "${PROFILE}" ] && [ -f "${PROFILE}" ]; then
-            phpvm_echo "${PROFILE}"
-            return
-        fi
-
-        local SHELL_TYPE
-        SHELL_TYPE="$(basename "$SHELL")"
-
-        if [ "$SHELL_TYPE" = "bash" ]; then
-            if [ -f "$HOME/.bashrc" ]; then
-                phpvm_echo "$HOME/.bashrc"
-            elif [ -f "$HOME/.bash_profile" ]; then
-                phpvm_echo "$HOME/.bash_profile"
-            fi
-        elif [ "$SHELL_TYPE" = "zsh" ]; then
-            if [ -f "$HOME/.zshrc" ]; then
-                phpvm_echo "$HOME/.zshrc"
-            elif [ -f "$HOME/.zprofile" ]; then
-                phpvm_echo "$HOME/.zprofile"
-            fi
-        fi
     }
 
     inject_phpvm_auto_switch() {
         local PHPVM_PROFILE
         PHPVM_PROFILE="$(phpvm_detect_profile)"
 
-        PHPVM_AUTO_SWITCH_STR="phpvm_auto_switch_on_cd() { local PHPVMRC_FILE=\"\$(phpvm_find_phpvmrc)\"; if [ -n \"\$PHPVMRC_FILE\" ]; then local PHP_VERSION=\$(cat \"\$PHPVMRC_FILE\"); phpvm use \$PHP_VERSION; fi };\ncd() { builtin cd \"\$@\" || return; phpvm_auto_switch_on_cd; };\nphpvm_auto_switch_on_cd"
+        PHPVM_AUTO_SWITCH_STR="phpvm_auto_switch_on_cd() { local PHPVMRC_FILE=\"\$(phpvm_find_phpvmrc)\"; if [ -n \"\$PHPVMRC_FILE\" ]; then local PHP_VERSION=\$(cat \"\$PHPVMRC_FILE\"); if [ -n \"\$PHP_VERSION\" ]; then phpvm use \$PHP_VERSION; else phpvm_echo 'No PHP version specified in .phpvmrc'; fi; fi }; cd() { builtin cd \"\$@\" || return; phpvm_auto_switch_on_cd; }; phpvm_auto_switch_on_cd"
 
         if [ -n "$PHPVM_PROFILE" ]; then
             if ! command grep -qc 'phpvm_auto_switch_on_cd' "$PHPVM_PROFILE"; then
@@ -154,7 +104,6 @@
 
     phpvm_do_install() {
         if [ -z "${METHOD}" ]; then
-            # Autodetect install method
             if phpvm_has git; then
                 install_phpvm_from_git
             elif phpvm_has curl || phpvm_has wget; then
@@ -168,8 +117,6 @@
             exit 1
         fi
 
-        phpvm_echo
-
         inject_phpvm_auto_switch
 
         local PHPVM_PROFILE
@@ -177,7 +124,6 @@
         local PROFILE_INSTALL_DIR
         PROFILE_INSTALL_DIR="$(phpvm_install_dir | command sed "s:^$HOME:\$HOME:")"
 
-        # Corrected this line to use node for index.js execution
         SOURCE_STR="\\nexport PHPVM_DIR=\"${PROFILE_INSTALL_DIR}\"\\n[ -s \"\$PHPVM_DIR/index.js\" ] && node \"\$PHPVM_DIR/index.js\"  # This runs phpvm with Node.js\\n"
 
         if [ -z "${PHPVM_PROFILE-}" ]; then
@@ -195,12 +141,9 @@
             fi
         fi
 
-        # Source phpvm immediately
-        # shellcheck source=/dev/null
         node "$(phpvm_install_dir)/index.js"
 
-        phpvm_echo "=> Close and reopen your terminal to start using phpvm or run the following to use it now:"
-        command printf "${SOURCE_STR}"
+        phpvm_echo "=> phpvm installation completed successfully!"
     }
 
     phpvm_do_install
