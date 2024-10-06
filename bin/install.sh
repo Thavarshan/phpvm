@@ -126,6 +126,24 @@
         fi
     }
 
+    inject_phpvm_auto_switch() {
+        local PHPVM_PROFILE
+        PHPVM_PROFILE="$(phpvm_detect_profile)"
+
+        PHPVM_AUTO_SWITCH_STR="phpvm_auto_switch_on_cd() { local PHPVMRC_FILE=\"\$(phpvm_find_phpvmrc)\"; if [ -n \"\$PHPVMRC_FILE\" ]; then local PHP_VERSION=\$(cat \"\$PHPVMRC_FILE\"); phpvm use \$PHP_VERSION; fi };\ncd() { builtin cd \"\$@\" || return; phpvm_auto_switch_on_cd; };\nphpvm_auto_switch_on_cd"
+
+        if [ -n "$PHPVM_PROFILE" ]; then
+            if ! command grep -qc 'phpvm_auto_switch_on_cd' "$PHPVM_PROFILE"; then
+                phpvm_echo "=> Injecting phpvm auto-switch functionality to $PHPVM_PROFILE"
+                echo -e "$PHPVM_AUTO_SWITCH_STR" >>"$PHPVM_PROFILE"
+            else
+                phpvm_echo "=> phpvm auto-switch already exists in $PHPVM_PROFILE"
+            fi
+        else
+            phpvm_echo "=> No profile found for auto-switch functionality"
+        fi
+    }
+
     phpvm_do_install() {
         if [ -z "${METHOD}" ]; then
             # Autodetect install method
@@ -144,12 +162,15 @@
 
         phpvm_echo
 
+        inject_phpvm_auto_switch
+
         local PHPVM_PROFILE
         PHPVM_PROFILE="$(phpvm_detect_profile)"
         local PROFILE_INSTALL_DIR
         PROFILE_INSTALL_DIR="$(phpvm_install_dir | command sed "s:^$HOME:\$HOME:")"
 
-        SOURCE_STR="\\nexport PHPVM_DIR=\"${PROFILE_INSTALL_DIR}\"\\n[ -s \"\$PHPVM_DIR/index.js\" ] && \\. \"\$PHPVM_DIR/index.js\"  # This loads phpvm\\n"
+        # Corrected this line to use node for index.js execution
+        SOURCE_STR="\\nexport PHPVM_DIR=\"${PROFILE_INSTALL_DIR}\"\\n[ -s \"\$PHPVM_DIR/index.js\" ] && node \"\$PHPVM_DIR/index.js\"  # This runs phpvm with Node.js\\n"
 
         if [ -z "${PHPVM_PROFILE-}" ]; then
             phpvm_echo "=> Profile not found. Tried ~/.bashrc, ~/.bash_profile, ~/.zshrc, ~/.zprofile."
@@ -168,7 +189,7 @@
 
         # Source phpvm immediately
         # shellcheck source=/dev/null
-        \. "$(phpvm_install_dir)/index.js"
+        node "$(phpvm_install_dir)/index.js"
 
         phpvm_echo "=> Close and reopen your terminal to start using phpvm or run the following to use it now:"
         command printf "${SOURCE_STR}"

@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 
-const { Command } = require('commander');
+const { program } = require('commander');
 const { installPHP } = require('./lib/commands/install');
 const { uninstallPHP } = require('./lib/commands/uninstall');
 const { listPHPVersions } = require('./lib/commands/list');
 const { usePHPVersion } = require('./lib/commands/use');
+const { autoSwitchPHPVersion } = require('./lib/commands/phpvmrc');
 const packageJson = require('./package.json');
 
-// Initialize the command-line program
-const program = new Command();
+autoSwitchPHPVersion(); // Auto-switch PHP version based on .phpvmrc
 
 /**
  * Configure the output for the program.
@@ -29,71 +29,64 @@ program
 
 /**
  * Command to install a specific PHP version.
- *
- * Usage: phpvm install <version>
- * Example: phpvm install 7.4.10
  */
 program
   .command('install <version>')
-  .alias('i') // Alias for shorthand usage
+  .alias('i')
   .description('Install a specific PHP version')
-  .action((version) => installPHP(version, program)); // Pass the program instance to commands
+  .action((version) => installPHP(version));
 
 /**
  * Command to uninstall a specific PHP version.
- *
- * Usage: phpvm uninstall <version>
- * Example: phpvm uninstall 7.4.10
  */
 program
   .command('uninstall <version>')
-  .alias('rm') // Alias for shorthand usage
+  .alias('rm')
   .description('Uninstall a specific PHP version')
-  .action((version) => uninstallPHP(version, program)); // Pass the program instance to commands
+  .action((version) => uninstallPHP(version, program));
 
 /**
  * Command to list all installed PHP versions.
- *
- * Usage: phpvm list
- * Example: phpvm list
  */
 program
   .command('list')
-  .alias('ls') // Alias for shorthand usage
+  .alias('ls')
   .description('List installed PHP versions')
-  .action(() => listPHPVersions(program)); // Pass the program instance to commands
+  .action(() => listPHPVersions(program));
 
 /**
  * Command to switch to a specific PHP version.
- *
- * Usage: phpvm use <version>
- * Example: phpvm use 7.4.10
  */
 program
   .command('use <version>')
-  .alias('switch') // Optional alias for more descriptive usage
+  .alias('switch')
   .description('Switch to a specific PHP version')
-  .action((version) => usePHPVersion(version, program)); // Pass the program instance to commands
+  .action((version) => {
+    try {
+      usePHPVersion(version, program);
+      console.log(`Switched to PHP ${version}`);
+    } catch (err) {
+      console.error(`Failed to switch PHP version: ${err.message}`);
+      process.exit(1); // Exit with an error code on failure
+    }
+  });
 
 /**
  * Command to simulate an error.
- *
- * Usage: phpvm error
- * Example: phpvm error
  */
 program
   .command('error')
   .description('Simulate an error')
   .action(() => {
-    console.logErr('Something went wrong!\n'); // Using custom output handler
+    process.stderr.write('Something went wrong!\n');
     process.exit(1); // Exit with error code 1 to indicate failure
   });
 
 /**
- * Global error handling in case of unhandled exceptions.
+ * Global error handling for invalid commands.
  */
 program.on('command:*', (invalidCommand) => {
-  console.logErr(`Invalid command: ${invalidCommand}\n`);
+  process.stderr.write(`Invalid command: ${invalidCommand.join(' ')}\n`);
   program.outputHelp(); // Suggest available commands
   process.exit(1); // Exit with error code
 });
