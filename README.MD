@@ -1,5 +1,7 @@
 [![PHP Version Manager (phpvm)](./assets/Banner.jpg)](https://github.com/Thavarshan/phpvm)
 
+# PHP Version Manager (phpvm)
+
 [![Version](https://img.shields.io/badge/version-v0.0.1-yellow.svg)](https://github.com/Thavarshan/phpvm/releases)
 [![Tests](https://github.com/Thavarshan/phpvm/actions/workflows/test.yml/badge.svg?label=test&branch=main)](https://github.com/Thavarshan/phpvm/actions/workflows/test.yml)
 [![Build](https://github.com/Thavarshan/phpvm/actions/workflows/use.yml/badge.svg?label=build&branch=main)](https://github.com/Thavarshan/phpvm/actions/workflows/use.yml)
@@ -81,7 +83,7 @@ This script clones the `phpvm` repository into `~/.phpvm` and attempts to add th
 
 ```sh
 export PHPVM_DIR="$HOME/.phpvm"
-[[ -s "$PHPVM_DIR/index.js" ]] && export PATH="$PHPVM_DIR/bin:$PATH" && node "$PHPVM_DIR/index.js"
+export PATH="$HOME/.local/bin:$PATH"
 ```
 
 ### Verify Installation
@@ -106,7 +108,7 @@ Then add the following lines to your shell's profile (`~/.bashrc`, `~/.zshrc`, e
 
 ```sh
 export PHPVM_DIR="$HOME/.phpvm"
-[[ -s "$PHPVM_DIR/index.js" ]] && export PATH="$PHPVM_DIR/bin:$PATH" && node "$PHPVM_DIR/index.js"
+export PATH="$HOME/.local/bin:$PATH"
 ```
 
 ### Manual Update
@@ -117,7 +119,6 @@ To manually update `phpvm` to the latest version, use the following commands:
 cd ~/.phpvm
 git fetch --tags origin
 git checkout `git describe --abbrev=0 --tags`
-source ~/.phpvm/index.js
 ```
 
 ## Usage
@@ -233,7 +234,7 @@ And remove the following lines from your shell's profile:
 
 ```sh
 export PHPVM_DIR="$HOME/.phpvm"
-[[ -s "$PHPVM_DIR/index.js" ]] && export PATH="$PHPVM_DIR/bin:$PATH" && node "$PHPVM_DIR/index.js"
+export PATH="$HOME/.local/bin:$PATH"
 ```
 
 ## Troubleshooting
