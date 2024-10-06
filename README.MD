@@ -70,18 +70,18 @@ PHP 8.1.1
 To **install** or **update** phpvm, run the following command using either `curl` or `wget`:
 
 ```sh
-curl -o- https://raw.githubusercontent.com/Thavarshan/phpvm/0.0.1/bin/install.sh | bash
+curl -o- https://raw.githubusercontent.com/Thavarshan/phpvm/main/bin/install.sh | bash
 ```
 
 ```sh
-wget -qO- https://raw.githubusercontent.com/Thavarshan/phpvm/0.0.1/bin/install | bash
+wget -qO- https://raw.githubusercontent.com/Thavarshan/phpvm/main/bin/install | bash
 ```
 
 This script clones the `phpvm` repository into `~/.phpvm` and attempts to add the following lines to your profile (`~/.bashrc`, `~/.zshrc`, or `~/.profile`):
 
 ```sh
 export PHPVM_DIR="$HOME/.phpvm"
-[ -s "$PHPVM_DIR/index.js" ] && \. "$PHPVM_DIR/index.js" # This loads phpvm
+[[ -s "$PHPVM_DIR/index.js" ]] && export PATH="$PHPVM_DIR/bin:$PATH" && node "$PHPVM_DIR/index.js"
 ```
 
 ### Verify Installation
@@ -106,7 +106,7 @@ Then add the following lines to your shell's profile (`~/.bashrc`, `~/.zshrc`, e
 
 ```sh
 export PHPVM_DIR="$HOME/.phpvm"
-[ -s "$PHPVM_DIR/index.js" ] && \. "$PHPVM_DIR/index.js" # This loads phpvm
+[[ -s "$PHPVM_DIR/index.js" ]] && export PATH="$PHPVM_DIR/bin:$PATH" && node "$PHPVM_DIR/index.js"
 ```
 
 ### Manual Update
@@ -233,7 +233,7 @@ And remove the following lines from your shell's profile:
 
 ```sh
 export PHPVM_DIR="$HOME/.phpvm"
-[ -s "$PHPVM_DIR/index.js" ] && \. "$PHPVM_DIR/index.js" # This loads phpvm
+[[ -s "$PHPVM_DIR/index.js" ]] && export PATH="$PHPVM_DIR/bin:$PATH" && node "$PHPVM_DIR/index.js"
 ```
 
 ## Troubleshooting
