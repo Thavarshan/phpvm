@@ -84,6 +84,13 @@
             phpvm_echo >&2 'Failed to install Node.js dependencies. Please report this!'
             exit 1
         }
+
+        # Make the phpvm binary executable
+        phpvm_echo "=> Making phpvm binary executable"
+        chmod +x "$INSTALL_DIR/bin/phpvm" || {
+            phpvm_echo >&2 'Failed to set execute permissions on phpvm binary. Please report this!'
+            exit 1
+        }
     }
 
     phpvm_detect_profile() {
