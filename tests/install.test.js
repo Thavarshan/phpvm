@@ -1,5 +1,4 @@
-// Move mocks to the top of the file, before imports
-
+// Mock utilities and dependencies at the top
 jest.mock('../lib/utils/platform', () => ({
   getPlatformDetails: jest.fn(),
   getLinuxDistro: jest.fn(),
@@ -25,7 +24,7 @@ jest.mock('path', () => ({
   resolve: jest.fn(),
 }));
 
-// Now import the install function after mocks
+// Import necessary functions
 const { installPHP } = require('../lib/commands/install');
 const { getPlatformDetails, getLinuxDistro } = require('../lib/utils/platform');
 const { downloadPHP } = require('../lib/utils/download');
@@ -34,85 +33,50 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-describe.skip('installPHP', () => {
+describe('installPHP', () => {
   const version = '7.4.10';
   const tarballPath = '/path/to/php-7.4.10.tar.gz';
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    jest.clearAllMocks(); // Reset mocks before each test
     console.log = jest.fn();
     console.error = jest.fn();
   });
 
-  it('should install PHP on macOS (Apple Silicon) using Homebrew', async () => {
-    getPlatformDetails.mockReturnValue('macos-apple-silicon'); // Mock Apple Silicon
+  test.each([
+    ['macos-apple-silicon', 'brew install php@7.4.10'],
+    ['macos-intel', 'brew install php@7.4.10'],
+  ])(
+    'should install PHP on %s using Homebrew',
+    async (platform, brewInstallCmd) => {
+      getPlatformDetails.mockReturnValue(platform);
+      downloadPHP.mockResolvedValue(tarballPath);
+      path.resolve.mockReturnValue('/path/to/.phpvm/versions/7.4.10/bin/php');
+      fs.existsSync.mockReturnValue(true);
+
+      await installPHP(version);
+
+      expect(getPlatformDetails).toHaveBeenCalled();
+      expect(downloadPHP).toHaveBeenCalled();
+      expect(execSync).toHaveBeenCalledWith('command -v brew', {
+        stdio: 'ignore',
+      });
+      expect(execSync).toHaveBeenCalledWith(brewInstallCmd, {
+        stdio: 'inherit',
+      });
+    },
+  );
+
+  test('should install PHP on Linux using apt', async () => {
+    getPlatformDetails.mockReturnValue('linux');
+    getLinuxDistro.mockReturnValue('ubuntu');
     downloadPHP.mockResolvedValue(tarballPath);
-    path.resolve.mockReturnValue('/path/to/.phpvm/versions/7.4.10/bin/php');
     fs.existsSync.mockReturnValue(true);
-
-    execSync.mockImplementation((command) => {
-      if (command.includes('brew install')) return; // Simulate successful brew install
-      throw new Error('Command failed');
-    });
-
-    console.log('Running macOS (Apple Silicon) test...'); // Debug log
 
     await installPHP(version);
 
     expect(getPlatformDetails).toHaveBeenCalled();
-    expect(downloadPHP).toHaveBeenCalled(); // Check if downloadPHP was called
-    expect(execSync).toHaveBeenCalledWith('command -v brew', {
-      stdio: 'ignore',
-    });
-    expect(execSync).toHaveBeenCalledWith('brew install php@7.4.10', {
-      stdio: 'inherit',
-    });
-  });
-
-  it('should install PHP on macOS (Intel) using Homebrew', async () => {
-    getPlatformDetails.mockReturnValue('macos-intel'); // Mock Intel-based macOS
-    downloadPHP.mockResolvedValue(tarballPath);
-    path.resolve.mockReturnValue('/path/to/.phpvm/versions/7.4.10/bin/php');
-    fs.existsSync.mockReturnValue(true);
-
-    execSync.mockImplementation((command) => {
-      if (command.includes('brew install')) return;
-      throw new Error('Command failed');
-    });
-
-    console.log('Running macOS (Intel) test...'); // Debug log
-
-    await installPHP(version);
-
-    expect(getPlatformDetails).toHaveBeenCalled();
-    expect(downloadPHP).toHaveBeenCalled(); // Check if downloadPHP was called
-    expect(execSync).toHaveBeenCalledWith('command -v brew', {
-      stdio: 'ignore',
-    });
-    expect(execSync).toHaveBeenCalledWith('brew install php@7.4.10', {
-      stdio: 'inherit',
-    });
-  });
-
-  it('should install PHP on Linux using apt', async () => {
-    getPlatformDetails.mockReturnValue('linux'); // Mock Linux
-    getLinuxDistro.mockReturnValue('ubuntu'); // Simulate Ubuntu
-    downloadPHP.mockResolvedValue(tarballPath);
-    path.resolve.mockReturnValue('/path/to/.phpvm/versions/7.4.10/bin/php');
-    fs.existsSync.mockReturnValue(true);
-
-    execSync.mockImplementation((command) => {
-      if (command.includes('apt-get install')) return; // Simulate apt-get install
-      throw new Error('Command failed');
-    });
-
-    console.log('Running Linux (apt) test...'); // Debug log
-
-    await installPHP(version);
-
-    expect(getPlatformDetails).toHaveBeenCalled();
-    expect(getLinuxDistro).toHaveBeenCalled(); // Confirm Linux distro detection
-    expect(downloadPHP).toHaveBeenCalled(); // Check if downloadPHP was called
+    expect(getLinuxDistro).toHaveBeenCalled();
     expect(execSync).toHaveBeenCalledWith('command -v apt-get', {
       stdio: 'ignore',
     });
@@ -122,10 +86,8 @@ describe.skip('installPHP', () => {
     );
   });
 
-  it('should handle unsupported platforms (Windows)', async () => {
-    getPlatformDetails.mockReturnValue('windows'); // Mock Windows
-
-    console.log('Running Windows unsupported test...'); // Debug log
+  test('should handle unsupported platforms like Windows', async () => {
+    getPlatformDetails.mockReturnValue('windows');
 
     await installPHP(version);
 
@@ -135,21 +97,13 @@ describe.skip('installPHP', () => {
     );
   });
 
-  it('should handle download failure and fallback to package manager', async () => {
-    getPlatformDetails.mockReturnValue('macos-apple-silicon'); // Simulate Apple Silicon
-    downloadPHP.mockRejectedValue(new Error('Download failed')); // Simulate download failure
-
-    execSync.mockImplementation((command) => {
-      if (command.includes('brew install')) return; // Simulate brew install success
-      throw new Error('Command failed');
-    });
-
-    console.log('Running download failure and fallback test...'); // Debug log
+  test('should fallback to package manager on download failure', async () => {
+    getPlatformDetails.mockReturnValue('macos-apple-silicon');
+    downloadPHP.mockRejectedValue(new Error('Download failed'));
 
     await installPHP(version);
 
-    expect(getPlatformDetails).toHaveBeenCalled();
-    expect(downloadPHP).toHaveBeenCalled(); // Check if downloadPHP was called
+    expect(downloadPHP).toHaveBeenCalled();
     expect(console.log).toHaveBeenCalledWith(
       expect.stringContaining(
         'Failed to download PHP 7.4.10. Attempting installation via package manager',
@@ -160,17 +114,15 @@ describe.skip('installPHP', () => {
     });
   });
 
-  it('should handle installation failure', async () => {
+  test('should handle installation failure due to extraction error', async () => {
     getPlatformDetails.mockReturnValue('macos-apple-silicon');
     downloadPHP.mockResolvedValue(tarballPath);
-    extractPHP.mockRejectedValue(new Error('Extraction failed')); // Simulate extraction failure
-
-    console.log('Running installation failure test...'); // Debug log
+    extractPHP.mockRejectedValue(new Error('Extraction failed'));
 
     await installPHP(version);
 
-    expect(downloadPHP).toHaveBeenCalled(); // Check if downloadPHP was called
-    expect(extractPHP).toHaveBeenCalled(); // Check if extractPHP was called
+    expect(downloadPHP).toHaveBeenCalled();
+    expect(extractPHP).toHaveBeenCalled();
     expect(console.error).toHaveBeenCalledWith(
       expect.stringContaining(
         'Failed to install PHP 7.4.10: Extraction failed',

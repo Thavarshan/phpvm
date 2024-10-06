@@ -6,7 +6,7 @@
 
 | Version | Security Fixes Until |
 | ------- | -------------------- |
-| 0.0.1   | October 05th, 2024    |
+| 0.0.1   | October 05th, 2024   |
 
 ## Reporting a Vulnerability
 

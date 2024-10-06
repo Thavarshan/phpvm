@@ -30,6 +30,11 @@ module.exports = [
   },
   {
     files: ['tests/**/*.js'], // Apply these rules specifically to test files
+    languageOptions: {
+      globals: {
+        ...globals.jest, // Jest global variables
+      },
+    },
     rules: {
       'no-unused-expressions': 'off', // Allow unused expressions in tests (e.g., expect())
     },

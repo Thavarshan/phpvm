@@ -26,7 +26,7 @@ describe('listPHPVersions', () => {
       });
     });
 
-    it('should list PHP versions managed by phpvm', () => {
+    test('should list PHP versions managed by phpvm', () => {
       const phpvmVersionsDir = path.resolve(
         process.env.HOME,
         '.phpvm',
@@ -51,7 +51,7 @@ describe('listPHPVersions', () => {
       });
     });
 
-    it('should handle no PHP versions managed by phpvm', () => {
+    test('should handle no PHP versions managed by phpvm', () => {
       const phpvmVersionsDir = path.resolve(
         process.env.HOME,
         '.phpvm',
@@ -75,7 +75,7 @@ describe('listPHPVersions', () => {
       );
     });
 
-    it('should handle no phpvm versions directory', () => {
+    test('should handle no phpvm versions directory', () => {
       const phpvmVersionsDir = path.resolve(
         process.env.HOME,
         '.phpvm',
@@ -97,7 +97,7 @@ describe('listPHPVersions', () => {
       );
     });
 
-    it('should list PHP versions installed via Homebrew on macOS', () => {
+    test('should list PHP versions installed via Homebrew on macOS', () => {
       Object.defineProperty(process, 'platform', {
         value: 'darwin',
       });
@@ -118,7 +118,7 @@ describe('listPHPVersions', () => {
       );
     });
 
-    it('should handle no PHP versions installed via Homebrew on macOS', () => {
+    test('should handle no PHP versions installed via Homebrew on macOS', () => {
       Object.defineProperty(process, 'platform', {
         value: 'darwin',
       });
@@ -138,7 +138,7 @@ describe('listPHPVersions', () => {
       );
     });
 
-    it('should handle Homebrew not installed on macOS', () => {
+    test('should handle Homebrew not installed on macOS', () => {
       Object.defineProperty(process, 'platform', {
         value: 'darwin',
       });
@@ -155,7 +155,7 @@ describe('listPHPVersions', () => {
       );
     });
 
-    it('should list PHP versions installed via APT on Linux', () => {
+    test('should list PHP versions installed via APT on Linux', () => {
       Object.defineProperty(process, 'platform', {
         value: 'linux',
       });
@@ -176,7 +176,7 @@ describe('listPHPVersions', () => {
       );
     });
 
-    it('should handle no PHP versions installed via APT on Linux', () => {
+    test('should handle no PHP versions installed via APT on Linux', () => {
       Object.defineProperty(process, 'platform', {
         value: 'linux',
       });
@@ -196,7 +196,7 @@ describe('listPHPVersions', () => {
       );
     });
 
-    it('should handle no PHP versions found via APT on Linux', () => {
+    test('should handle no PHP versions found via APT on Linux', () => {
       Object.defineProperty(process, 'platform', {
         value: 'linux',
       });
@@ -213,7 +213,7 @@ describe('listPHPVersions', () => {
       );
     });
 
-    it('should list PHP versions installed via DNF on Linux', () => {
+    test('should list PHP versions installed via DNF on Linux', () => {
       Object.defineProperty(process, 'platform', {
         value: 'linux',
       });
@@ -234,7 +234,7 @@ describe('listPHPVersions', () => {
       );
     });
 
-    it('should handle no PHP versions installed via DNF on Linux', () => {
+    test('should handle no PHP versions installed via DNF on Linux', () => {
       Object.defineProperty(process, 'platform', {
         value: 'linux',
       });
@@ -254,7 +254,7 @@ describe('listPHPVersions', () => {
       );
     });
 
-    it('should handle no PHP versions found via DNF on Linux', () => {
+    test('should handle no PHP versions found via DNF on Linux', () => {
       Object.defineProperty(process, 'platform', {
         value: 'linux',
       });

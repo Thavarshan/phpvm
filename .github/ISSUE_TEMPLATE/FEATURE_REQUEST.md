@@ -1,6 +1,6 @@
 ---
-name: "Feature request"
-about: "Request a new and or additional feature."
+name: 'Feature request'
+about: 'Request a new and or additional feature.'
 ---
 
 <!-- DO NOT THROW THIS AWAY -->

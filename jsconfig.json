@@ -9,7 +9,10 @@
       "*": [
         "node_modules/*"
       ]
-    }
+    },
+    "types": [
+      "jest"
+    ]
   },
   "include": [
     "lib/**/*",

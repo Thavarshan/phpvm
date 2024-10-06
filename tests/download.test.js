@@ -23,7 +23,7 @@ describe('downloadPHP', () => {
     jest.clearAllMocks();
   });
 
-  it('should download PHP binary for the specified version and platform', async () => {
+  test('should download PHP binary for the specified version and platform', async () => {
     fetch.mockResolvedValue({
       ok: true,
       body: {
@@ -49,7 +49,7 @@ describe('downloadPHP', () => {
     expect(fs.createWriteStream).toHaveBeenCalledWith(tarballPath);
   });
 
-  it('should throw an error if the platform is unsupported', async () => {
+  test('should throw an error if the platform is unsupported', async () => {
     const unsupportedPlatform = 'unsupported-platform';
 
     await expect(downloadPHP(version, unsupportedPlatform)).rejects.toThrow(
@@ -57,7 +57,7 @@ describe('downloadPHP', () => {
     );
   });
 
-  it('should throw an error if the PHP binary is not available', async () => {
+  test('should throw an error if the PHP binary is not available', async () => {
     fetch.mockResolvedValue({
       ok: false,
     });
@@ -67,7 +67,7 @@ describe('downloadPHP', () => {
     );
   });
 
-  it('should throw an error if the download fails', async () => {
+  test('should throw an error if the download fails', async () => {
     fetch.mockResolvedValue({
       ok: true,
       body: {

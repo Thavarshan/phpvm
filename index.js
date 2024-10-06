@@ -5,7 +5,7 @@ const { installPHP } = require('./lib/commands/install');
 const { uninstallPHP } = require('./lib/commands/uninstall');
 const { listPHPVersions } = require('./lib/commands/list');
 const { usePHPVersion } = require('./lib/commands/use');
-const { autoSwitchPHPVersion } = require('./lib/commands/phpvmrc');
+const { autoSwitchPHPVersion } = require('./lib/utils/phpvmrc');
 const packageJson = require('./package.json');
 
 autoSwitchPHPVersion(); // Auto-switch PHP version based on .phpvmrc

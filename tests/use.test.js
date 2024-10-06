@@ -16,7 +16,7 @@ jest.mock('path');
 jest.mock('child_process');
 jest.mock('../lib/utils/platform');
 
-describe.skip('usePHPVersion', () => {
+describe('usePHPVersion', () => {
   const program = {
     error: jest.fn(),
   };
@@ -30,7 +30,7 @@ describe.skip('usePHPVersion', () => {
     jest.restoreAllMocks();
   });
 
-  it('should switch to PHP version installed by phpvm', () => {
+  test('should switch to PHP version installed by phpvm', () => {
     const version = '7.4.10';
     const versionDir = '/home/user/.phpvm/versions/7.4.10';
     getPlatformDetails.mockReturnValue('macos-apple-silicon');
@@ -45,7 +45,7 @@ describe.skip('usePHPVersion', () => {
     );
   });
 
-  it('should switch to Homebrew-managed PHP version on macOS', () => {
+  test('should switch to Homebrew-managed PHP version on macOS', () => {
     const version = '7.4.10';
     const brewPrefix = '/usr/local';
     const brewPHPPath = `${brewPrefix}/opt/php@${version}/bin/php`;
@@ -63,7 +63,7 @@ describe.skip('usePHPVersion', () => {
     );
   });
 
-  it('should switch to apt-managed PHP version on Linux', () => {
+  test('should switch to apt-managed PHP version on Linux', () => {
     const version = '7.4';
     const aptPHPPath = `/usr/bin/php${version}`;
     getPlatformDetails.mockReturnValue('linux');
@@ -78,7 +78,7 @@ describe.skip('usePHPVersion', () => {
     );
   });
 
-  it('should handle unsupported platforms', () => {
+  test('should handle unsupported platforms', () => {
     const version = '7.4.10';
     getPlatformDetails.mockReturnValue('unsupported');
     path.resolve.mockReturnValue('/home/user/.phpvm/versions/7.4.10');
@@ -91,7 +91,7 @@ describe.skip('usePHPVersion', () => {
     );
   });
 
-  it('should handle errors during switching', () => {
+  test('should handle errors during switching', () => {
     const version = '7.4.10';
     getPlatformDetails.mockReturnValue('macos-apple-silicon');
     path.resolve.mockReturnValue('/home/user/.phpvm/versions/7.4.10');
@@ -117,7 +117,7 @@ describe('useHomebrewPHP', () => {
     console.log = jest.fn();
   });
 
-  it('should switch to Homebrew-managed PHP version', () => {
+  test('should switch to Homebrew-managed PHP version', () => {
     const version = '7.4.10';
     const brewPrefix = '/usr/local';
     const brewPHPPath = `${brewPrefix}/opt/php@${version}/bin/php`;
@@ -134,7 +134,7 @@ describe('useHomebrewPHP', () => {
     );
   });
 
-  it('should handle errors during switching', () => {
+  test('should handle errors during switching', () => {
     const version = '7.4.10';
     execSync.mockImplementation(() => {
       throw new Error('Mocked error');
@@ -158,7 +158,7 @@ describe('useLinuxPHP', () => {
     console.log = jest.fn();
   });
 
-  it('should switch to apt-managed PHP version on Ubuntu', () => {
+  test('should switch to apt-managed PHP version on Ubuntu', () => {
     const version = '7.4';
     const aptPHPPath = `/usr/bin/php${version}`;
     getLinuxDistro.mockReturnValue('ubuntu');
@@ -172,7 +172,7 @@ describe('useLinuxPHP', () => {
     );
   });
 
-  it('should handle unsupported Linux distributions', () => {
+  test('should handle unsupported Linux distributions', () => {
     const version = '7.4';
     getLinuxDistro.mockReturnValue('unsupported-distro');
 
@@ -183,7 +183,7 @@ describe('useLinuxPHP', () => {
     );
   });
 
-  it('should handle errors during switching', () => {
+  test('should handle errors during switching', () => {
     const version = '7.4';
     getLinuxDistro.mockReturnValue('ubuntu');
     fs.existsSync.mockImplementation(() => {
@@ -208,7 +208,7 @@ describe('setPHPVersion', () => {
     console.log = jest.fn();
   });
 
-  it('should set the PHP version', () => {
+  test('should set the PHP version', () => {
     const phpPath = '/usr/bin/php7.4';
     const version = '7.4';
     const phpVersionFile = path.resolve(
@@ -235,7 +235,7 @@ describe('setPHPVersion', () => {
     );
   });
 
-  it('should handle errors during setting PHP version', () => {
+  test('should handle errors during setting PHP version', () => {
     const phpPath = '/usr/bin/php7.4';
     const version = '7.4';
     fs.writeFileSync.mockImplementation(() => {
@@ -251,7 +251,7 @@ describe('setPHPVersion', () => {
 });
 
 describe('getActivePHPVersion', () => {
-  it('should return the currently active PHP version', () => {
+  test('should return the currently active PHP version', () => {
     const version = '7.4';
     const phpVersionFile = path.resolve(
       process.env.HOME,
@@ -265,7 +265,7 @@ describe('getActivePHPVersion', () => {
     expect(activeVersion).toBe(version);
   });
 
-  it('should return null if no active PHP version', () => {
+  test('should return null if no active PHP version', () => {
     const phpVersionFile = path.resolve(
       process.env.HOME,
       '.phpvm',
@@ -279,7 +279,7 @@ describe('getActivePHPVersion', () => {
 });
 
 describe('isLocalBinInPath', () => {
-  it('should return true if $HOME/.local/bin is in PATH', () => {
+  test('should return true if $HOME/.local/bin is in PATH', () => {
     const localBinDir = path.resolve(process.env.HOME, '.local', 'bin');
     process.env.PATH = `${localBinDir}:${process.env.PATH}`;
 
@@ -287,7 +287,7 @@ describe('isLocalBinInPath', () => {
     expect(result).toBe(true);
   });
 
-  it('should return false if $HOME/.local/bin is not in PATH', () => {
+  test('should return false if $HOME/.local/bin is not in PATH', () => {
     process.env.PATH = '/usr/local/bin:/usr/bin:/bin';
 
     const result = isLocalBinInPath();
