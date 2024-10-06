@@ -8,7 +8,7 @@ const { usePHPVersion } = require('./lib/commands/use');
 const { autoSwitchPHPVersion } = require('./lib/utils/phpvmrc');
 const packageJson = require('./package.json');
 
-autoSwitchPHPVersion(); // Auto-switch PHP version based on .phpvmrc
+// autoSwitchPHPVersion(); // Auto-switch PHP version based on .phpvmrc
 
 /**
  * Configure the output for the program.

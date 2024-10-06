@@ -114,6 +114,54 @@
         fi
     }
 
+    inject_phpvm_config() {
+        local PHPVM_PROFILE
+        PHPVM_PROFILE="$(phpvm_detect_profile)"
+        local PROFILE_INSTALL_DIR
+        PROFILE_INSTALL_DIR="$(phpvm_install_dir | command sed "s:^$HOME:\$HOME:")"
+
+        PHPVM_CONFIG_STR="
+
+# Set up PHPVM environment
+export PHPVM_DIR=\"${PROFILE_INSTALL_DIR}\"
+
+# Only source phpvm if it's needed (for auto-switching versions)
+phpvm_auto_switch_on_cd() {
+    local PHPVMRC_FILE=\"\$(phpvm_find_phpvmrc)\"
+    if [ -n \"\$PHPVMRC_FILE\" ]; then
+        local PHP_VERSION=\$(cat \"\$PHPVMRC_FILE\")
+        if [ -n \"\$PHP_VERSION\" ]; then
+            phpvm use \$PHP_VERSION
+        else
+            echo 'No PHP version specified in .phpvmrc'
+        fi
+    fi
+}
+
+# Update 'cd' command to automatically switch versions based on .phpvmrc
+cd() {
+    builtin cd \"\$@\" || return
+    phpvm_auto_switch_on_cd
+}
+
+# Load PHPVM if necessary (this will allow phpvm to be invoked manually)
+if [ -s \"\$PHPVM_DIR/index.js\" ]; then
+    export PATH=\"\$PHPVM_DIR/bin:\$PATH\"
+fi
+"
+
+        if [ -n "$PHPVM_PROFILE" ]; then
+            if ! command grep -qc 'phpvm_auto_switch_on_cd' "$PHPVM_PROFILE"; then
+                phpvm_echo "=> Injecting phpvm config into $PHPVM_PROFILE"
+                echo -e "$PHPVM_CONFIG_STR" >>"$PHPVM_PROFILE"
+            else
+                phpvm_echo "=> phpvm config already exists in $PHPVM_PROFILE"
+            fi
+        else
+            phpvm_echo "=> No profile found for phpvm config injection"
+        fi
+    }
+
     phpvm_do_install() {
         if [ -z "${METHOD}" ]; then
             if phpvm_has git; then
@@ -129,28 +177,7 @@
             exit 1
         fi
 
-        local PHPVM_PROFILE
-        PHPVM_PROFILE="$(phpvm_detect_profile)"
-        local PROFILE_INSTALL_DIR
-        PROFILE_INSTALL_DIR="$(phpvm_install_dir | command sed "s:^$HOME:\$HOME:")"
-
-        # Inject the source line in the shell profile
-        SOURCE_STR="\\nexport PHPVM_DIR=\"${PROFILE_INSTALL_DIR}\"\\n[ -s \"\$PHPVM_DIR/index.js\" ] && node \"\$PHPVM_DIR/index.js\"  # This runs phpvm with Node.js\\n"
-
-        if [ -z "${PHPVM_PROFILE-}" ]; then
-            phpvm_echo "=> Profile not found. Tried ~/.bashrc, ~/.bash_profile, ~/.zshrc, ~/.zprofile."
-            phpvm_echo "=> Create one of them and run this script again"
-            phpvm_echo "=> Alternatively, append the following lines to the correct file yourself:"
-            command printf "${SOURCE_STR}"
-            phpvm_echo
-        else
-            if ! command grep -qc '/phpvm/index.js' "$PHPVM_PROFILE"; then
-                phpvm_echo "=> Appending phpvm source string to $PHPVM_PROFILE"
-                command printf "${SOURCE_STR}" >>"$PHPVM_PROFILE"
-            else
-                phpvm_echo "=> phpvm source string already in $PHPVM_PROFILE"
-            fi
-        fi
+        inject_phpvm_config
 
         node "$(phpvm_install_dir)/index.js"
 
