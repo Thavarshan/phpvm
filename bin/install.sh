@@ -27,7 +27,15 @@
     }
 
     phpvm_latest_version() {
-        phpvm_echo "0.0.1" # replace with your current phpvm version
+        # Fetch the latest version from GitHub
+        latest_version=$(curl -s https://api.github.com/repos/Thavarshan/phpvm/releases/latest | grep -oP '"tag_name": "\K(.*)(?=")')
+
+        # Check if the fetch was successful
+        if [ -z "$latest_version" ]; then
+            phpvm_echo "main" # Default to the main branch version
+        else
+            phpvm_echo "$latest_version"
+        fi
     }
 
     phpvm_download() {
