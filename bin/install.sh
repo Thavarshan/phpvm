@@ -114,6 +114,12 @@ EOL
             exit 1
         }
 
+        # Additional step to set ownership to the current user to avoid permission issues
+        sudo chown "$(whoami)" "$BIN_DIR/phpvm" || {
+            phpvm_echo >&2 "Failed to change ownership of phpvm in $BIN_DIR. Please ensure you have the necessary permissions."
+            exit 1
+        }
+
         phpvm_echo "=> phpvm has been installed to $BIN_DIR and is now globally available."
     }
 
