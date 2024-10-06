@@ -87,6 +87,7 @@
         }
 
         phpvm_create_launcher
+        phpvm_create_symlink
     }
 
     phpvm_create_launcher() {
@@ -104,6 +105,19 @@ EOL
 
         # Make the shell script executable
         chmod +x "$INSTALL_DIR/bin/phpvm"
+    }
+
+    phpvm_create_symlink() {
+        local INSTALL_DIR
+        INSTALL_DIR="$(phpvm_install_dir)"
+
+        # Create a global symlink for phpvm
+        if [ -d "/usr/local/bin" ]; then
+            sudo ln -sf "$INSTALL_DIR/bin/phpvm" /usr/local/bin/phpvm
+            phpvm_echo "=> Created a global symlink for phpvm at /usr/local/bin/phpvm"
+        else
+            phpvm_echo "=> /usr/local/bin not found, please ensure it's in your PATH"
+        fi
     }
 
     phpvm_detect_profile() {
@@ -141,7 +155,6 @@ EOL
         PROFILE_INSTALL_DIR="$(phpvm_install_dir | command sed "s:^$HOME:\$HOME:")"
 
         PHPVM_CONFIG_STR="
-# Load PHPVM if it exists (similar to nvm)
 [[ -s \"\$PHPVM_DIR/index.js\" ]] && export PATH=\"\$PHPVM_DIR/bin:\$PATH\" && node \"\$PHPVM_DIR/index.js\"
 "
 
