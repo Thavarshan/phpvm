@@ -86,6 +86,34 @@
         }
     }
 
+    phpvm_detect_profile() {
+        if [ "${PROFILE-}" = '/dev/null' ]; then
+            return
+        fi
+
+        if [ -n "${PROFILE}" ] && [ -f "${PROFILE}" ]; then
+            phpvm_echo "${PROFILE}"
+            return
+        fi
+
+        local SHELL_TYPE
+        SHELL_TYPE="$(basename "$SHELL")"
+
+        if [ "$SHELL_TYPE" = "bash" ]; then
+            if [ -f "$HOME/.bashrc" ]; then
+                phpvm_echo "$HOME/.bashrc"
+            elif [ -f "$HOME/.bash_profile" ]; then
+                phpvm_echo "$HOME/.bash_profile"
+            fi
+        elif [ "$SHELL_TYPE" = "zsh" ]; then
+            if [ -f "$HOME/.zshrc" ]; then
+                phpvm_echo "$HOME/.zshrc"
+            elif [ -f "$HOME/.zprofile" ]; then
+                phpvm_echo "$HOME/.zprofile"
+            fi
+        fi
+    }
+
     inject_phpvm_config() {
         local PHPVM_PROFILE
         PHPVM_PROFILE="$(phpvm_detect_profile)"
