@@ -60,6 +60,8 @@ PHP 8.1.1
 - Easily switch between PHP versions.
 - Manage global PHP settings and extensions.
 - Install PHP versions via package managers like `apt` or `brew`, or from source.
+- Auto-detect `.phpvmrc` files to switch PHP versions based on project configuration.
+- Supports Homebrew and Linux package managers, or installation from source for more advanced setups.
 
 ## Installation
 
@@ -68,7 +70,6 @@ PHP 8.1.1
 To **install** or **update** phpvm, run the following command using either `curl` or `wget`:
 
 ```sh
-
 curl -o- https://raw.githubusercontent.com/Thavarshan/phpvm/0.0.1/bin/install.sh | bash
 ```
 
@@ -196,6 +197,19 @@ export PHPVM_MIRROR=https://php-mirror-url.com
 phpvm install 8.0
 ```
 
+### Auto-Switch PHP Version Using `.phpvmrc`
+
+If a `.phpvmrc` file is present in the directory, `phpvm` will automatically switch to the PHP version specified in the file. This allows seamless version switching when working on different projects that require different PHP versions.
+
+To set up the `.phpvmrc` file for your project, create a file with the following content:
+
+```sh
+# .phpvmrc
+8.0.8
+```
+
+When navigating to a directory with this file, `phpvm` will automatically switch to the specified PHP version.
+
 ## Running Tests
 
 You can run tests using Jest. Install the dependencies and run the following command:
@@ -229,6 +243,7 @@ If you encounter any issues with `phpvm` or its functionality, consider the foll
 - Make sure your shell configuration file is correctly sourcing `phpvm`.
 - For macOS, ensure that the necessary command line tools (like Homebrew or Xcode) are installed.
 - Restart your terminal after making any changes.
+- Ensure you have proper permissions to install PHP versions and modify system paths.
 
 ## Maintainers
 
