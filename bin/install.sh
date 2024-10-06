@@ -34,17 +34,6 @@
         fi
     }
 
-    phpvm_download() {
-        if phpvm_has "curl"; then
-            curl --fail --compressed -q "$@"
-        elif phpvm_has "wget"; then
-            ARGS=$(phpvm_echo "$@" | command sed -e 's/--progress-bar /--progress=bar /' \
-                -e 's/--compressed //' -e 's/--fail //' -e 's/-L //' -e 's/-I /--server-response /' \
-                -e 's/-s /-q /' -e 's/-sS /-nv /' -e 's/-o /-O /' -e 's/-C - /-c /')
-            eval wget $ARGS
-        fi
-    }
-
     install_phpvm_from_git() {
         local INSTALL_DIR
         INSTALL_DIR="$(phpvm_install_dir)"
@@ -87,37 +76,21 @@
         }
 
         phpvm_create_launcher
-        phpvm_create_symlink
     }
 
     phpvm_create_launcher() {
         local INSTALL_DIR
         INSTALL_DIR="$(phpvm_install_dir)"
 
-        # Create the bin directory if it doesn't exist
-        mkdir -p "$INSTALL_DIR/bin"
-
         # Create a shell script that runs the index.js
-        cat <<EOL >"$INSTALL_DIR/bin/phpvm"
+        cat <<EOL >"$INSTALL_DIR/phpvm"
 #!/usr/bin/env bash
+export PHPVM_DIR="${INSTALL_DIR}"
 node "\$PHPVM_DIR/index.js" "\$@"
 EOL
 
         # Make the shell script executable
-        chmod +x "$INSTALL_DIR/bin/phpvm"
-    }
-
-    phpvm_create_symlink() {
-        local INSTALL_DIR
-        INSTALL_DIR="$(phpvm_install_dir)"
-
-        # Create a global symlink for phpvm
-        if [ -d "/usr/local/bin" ]; then
-            sudo ln -sf "$INSTALL_DIR/bin/phpvm" /usr/local/bin/phpvm
-            phpvm_echo "=> Created a global symlink for phpvm at /usr/local/bin/phpvm"
-        else
-            phpvm_echo "=> /usr/local/bin not found, please ensure it's in your PATH"
-        fi
+        chmod +x "$INSTALL_DIR/phpvm"
     }
 
     phpvm_detect_profile() {
@@ -155,11 +128,13 @@ EOL
         PROFILE_INSTALL_DIR="$(phpvm_install_dir | command sed "s:^$HOME:\$HOME:")"
 
         PHPVM_CONFIG_STR="
-[[ -s \"\$PHPVM_DIR/index.js\" ]] && export PATH=\"\$PHPVM_DIR/bin:\$PATH\" && node \"\$PHPVM_DIR/index.js\"
+# Load PHPVM if it exists (similar to nvm)
+export PHPVM_DIR=\"\$HOME/.phpvm\"
+[[ -s \"\$PHPVM_DIR/phpvm\" ]] && source \"\$PHPVM_DIR/phpvm\"
 "
 
         if [ -n "$PHPVM_PROFILE" ]; then
-            if ! command grep -qc '/phpvm/bin/phpvm' "$PHPVM_PROFILE"; then
+            if ! command grep -qc '/phpvm' "$PHPVM_PROFILE"; then
                 phpvm_echo "=> Injecting phpvm config into $PHPVM_PROFILE"
                 echo -e "$PHPVM_CONFIG_STR" >>"$PHPVM_PROFILE"
             else
