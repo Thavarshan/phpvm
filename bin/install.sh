@@ -23,14 +23,10 @@
     }
 
     phpvm_latest_version() {
-        # Fetch the latest version from GitHub
         latest_version=$(curl -s https://api.github.com/repos/Thavarshan/phpvm/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-
-        # Default to main if the version is not found
         if [ -z "$latest_version" ]; then
             latest_version="main"
         fi
-
         phpvm_echo "$latest_version"
     }
 
@@ -84,6 +80,23 @@
             phpvm_echo >&2 'Failed to install Node.js dependencies. Please report this!'
             exit 1
         }
+
+        # Ensure the bin directory and executable exist
+        phpvm_create_bin
+    }
+
+    phpvm_create_bin() {
+        local INSTALL_DIR
+        INSTALL_DIR="$(phpvm_install_dir)"
+
+        # Create the bin directory if it doesn't exist
+        mkdir -p "$INSTALL_DIR/bin"
+
+        # Create a symlink to the phpvm executable
+        ln -sf "$INSTALL_DIR/index.js" "$INSTALL_DIR/bin/phpvm"
+
+        # Make the symlink executable
+        chmod +x "$INSTALL_DIR/bin/phpvm"
     }
 
     phpvm_detect_profile() {
