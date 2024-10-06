@@ -97,26 +97,17 @@ EOL
         chmod +x "$INSTALL_DIR/phpvm"
 
         # Copy the launcher script to a directory in the user's PATH
-        local BIN_DIR="/usr/local/bin"
-        if [ ! -d "$BIN_DIR" ]; then
-            BIN_DIR="$HOME/.local/bin"
-            mkdir -p "$BIN_DIR"
-        fi
+        local BIN_DIR="$HOME/.local/bin"
+        mkdir -p "$BIN_DIR"
 
-        sudo cp "$INSTALL_DIR/phpvm" "$BIN_DIR/phpvm" || {
+        cp "$INSTALL_DIR/phpvm" "$BIN_DIR/phpvm" || {
             phpvm_echo >&2 "Failed to copy phpvm to $BIN_DIR. Please ensure you have the necessary permissions."
             exit 1
         }
 
         # Ensure the script has the correct permissions
-        sudo chmod +x "$BIN_DIR/phpvm" || {
+        chmod +x "$BIN_DIR/phpvm" || {
             phpvm_echo >&2 "Failed to set execute permissions for phpvm in $BIN_DIR. Please ensure you have the necessary permissions."
-            exit 1
-        }
-
-        # Additional step to set ownership to the current user to avoid permission issues
-        sudo chown "$(whoami)" "$BIN_DIR/phpvm" || {
-            phpvm_echo >&2 "Failed to change ownership of phpvm in $BIN_DIR. Please ensure you have the necessary permissions."
             exit 1
         }
 
@@ -156,13 +147,11 @@ EOL
     inject_phpvm_config() {
         local PHPVM_PROFILE
         PHPVM_PROFILE="$(phpvm_detect_profile)"
-        local PROFILE_INSTALL_DIR
-        PROFILE_INSTALL_DIR="$(phpvm_install_dir | command sed "s:^$HOME:\$HOME:")"
 
         PHPVM_CONFIG_STR="
-# Load PHPVM if it exists (similar to nvm)
+# Load PHPVM if it exists
 export PHPVM_DIR=\"\$HOME/.phpvm\"
-[[ -s \"\$PHPVM_DIR/phpvm\" ]] && source \"\$PHPVM_DIR/phpvm\"
+export PATH=\"\$HOME/.local/bin:\$PATH\"
 "
 
         if [ -n "$PHPVM_PROFILE" ]; then
