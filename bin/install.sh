@@ -23,13 +23,15 @@
     }
 
     phpvm_latest_version() {
+        # Fetch the latest version from GitHub
         latest_version=$(curl -s https://api.github.com/repos/Thavarshan/phpvm/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+
+        # If we can't fetch the version, default to 'main' but only return the version string, no echoing messages here
         if [ -z "$latest_version" ]; then
-            phpvm_echo "Unable to fetch the latest version, defaulting to 'main'."
-            phpvm_echo "main" # Default to the main branch version
-        else
-            phpvm_echo "$latest_version"
+            latest_version="main" # Default to the main branch version
         fi
+
+        phpvm_echo "$latest_version"
     }
 
     phpvm_download() {
