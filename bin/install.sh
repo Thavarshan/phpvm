@@ -26,9 +26,9 @@
         # Fetch the latest version from GitHub
         latest_version=$(curl -s https://api.github.com/repos/Thavarshan/phpvm/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
 
-        # If we can't fetch the version, default to 'main'
+        # Default to main if the version is not found
         if [ -z "$latest_version" ]; then
-            latest_version="main" # Default to the main branch version
+            latest_version="main"
         fi
 
         phpvm_echo "$latest_version"
@@ -114,39 +114,6 @@
         fi
     }
 
-    # Added the phpvm_find_phpvmrc function to find .phpvmrc file
-    phpvm_find_phpvmrc() {
-        local current_dir
-        current_dir="$(pwd)"
-
-        while [ "$current_dir" != "/" ]; do
-            if [ -f "$current_dir/.phpvmrc" ]; then
-                echo "$current_dir/.phpvmrc"
-                return
-            fi
-            current_dir="$(dirname "$current_dir")"
-        done
-        return 1 # Not found
-    }
-
-    inject_phpvm_auto_switch() {
-        local PHPVM_PROFILE
-        PHPVM_PROFILE="$(phpvm_detect_profile)"
-
-        PHPVM_AUTO_SWITCH_STR="phpvm_auto_switch_on_cd() { local PHPVMRC_FILE=\"\$(phpvm_find_phpvmrc)\"; if [ -n \"\$PHPVMRC_FILE\" ]; then local PHP_VERSION=\$(cat \"\$PHPVMRC_FILE\"); if [ -n \"\$PHP_VERSION\" ]; then phpvm use \$PHP_VERSION; else phpvm_echo 'No PHP version specified in .phpvmrc'; fi; fi }; cd() { builtin cd \"\$@\" || return; phpvm_auto_switch_on_cd; }; phpvm_auto_switch_on_cd"
-
-        if [ -n "$PHPVM_PROFILE" ]; then
-            if ! command grep -qc 'phpvm_auto_switch_on_cd' "$PHPVM_PROFILE"; then
-                phpvm_echo "=> Injecting phpvm auto-switch functionality to $PHPVM_PROFILE"
-                echo -e "$PHPVM_AUTO_SWITCH_STR" >>"$PHPVM_PROFILE"
-            else
-                phpvm_echo "=> phpvm auto-switch already exists in $PHPVM_PROFILE"
-            fi
-        else
-            phpvm_echo "=> No profile found for auto-switch functionality"
-        fi
-    }
-
     phpvm_do_install() {
         if [ -z "${METHOD}" ]; then
             if phpvm_has git; then
@@ -162,13 +129,12 @@
             exit 1
         fi
 
-        inject_phpvm_auto_switch
-
         local PHPVM_PROFILE
         PHPVM_PROFILE="$(phpvm_detect_profile)"
         local PROFILE_INSTALL_DIR
         PROFILE_INSTALL_DIR="$(phpvm_install_dir | command sed "s:^$HOME:\$HOME:")"
 
+        # Inject the source line in the shell profile
         SOURCE_STR="\\nexport PHPVM_DIR=\"${PROFILE_INSTALL_DIR}\"\\n[ -s \"\$PHPVM_DIR/index.js\" ] && node \"\$PHPVM_DIR/index.js\"  # This runs phpvm with Node.js\\n"
 
         if [ -z "${PHPVM_PROFILE-}" ]; then
