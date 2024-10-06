@@ -103,8 +103,14 @@ EOL
             mkdir -p "$BIN_DIR"
         fi
 
-        cp "$INSTALL_DIR/phpvm" "$BIN_DIR/phpvm" || {
+        sudo cp "$INSTALL_DIR/phpvm" "$BIN_DIR/phpvm" || {
             phpvm_echo >&2 "Failed to copy phpvm to $BIN_DIR. Please ensure you have the necessary permissions."
+            exit 1
+        }
+
+        # Ensure the script has the correct permissions
+        sudo chmod +x "$BIN_DIR/phpvm" || {
+            phpvm_echo >&2 "Failed to set execute permissions for phpvm in $BIN_DIR. Please ensure you have the necessary permissions."
             exit 1
         }
 
