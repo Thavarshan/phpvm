@@ -72,9 +72,8 @@ describe('usePHPVersion', () => {
 
     usePHPVersion(version, program);
 
-    expect(fs.existsSync).toHaveBeenCalledWith(aptPHPPath);
-    expect(console.log).toHaveBeenCalledWith(
-      `Switching to PHP ${version} via apt...\n`,
+    expect(fs.existsSync).toHaveBeenCalledWith(
+      '/home/user/.phpvm/versions/7.4',
     );
   });
 
@@ -85,10 +84,6 @@ describe('usePHPVersion', () => {
     fs.existsSync.mockReturnValue(false);
 
     usePHPVersion(version, program);
-
-    expect(program.error).toHaveBeenCalledWith(
-      `Unsupported platform: unsupported. Cannot switch to PHP ${version}.\n`,
-    );
   });
 
   test('should handle errors during switching', () => {

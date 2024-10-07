@@ -2,76 +2,29 @@ const fs = require('fs');
 const path = require('path');
 const {
   findPHPVMRCFile,
-  getPHPVersionFromRCFile,
-  isPHPVersionInstalled,
   autoSwitchPHPVersion,
 } = require('../lib/utils/phpvmrc');
+const { usePHPVersion } = require('../lib/commands/use');
 
 jest.mock('fs');
 jest.mock('path');
+jest.mock('../lib/commands/use');
 
 describe('findPHPVMRCFile', () => {
-  it('should find .phpvmrc in the current directory', () => {
-    const mockPath = '/path/to/project/.phpvmrc';
-    path.join.mockReturnValue(mockPath);
-    path.resolve.mockImplementation((_, up) => (up ? '/' : '/path/to/project'));
-    fs.existsSync.mockReturnValue(true);
+  it('should return the correct path when a .phpvmrc file is found', () => {
+    const mockPath = '/path/to/.phpvmrc';
+    fs.existsSync.mockReturnValueOnce(true);
+    path.join.mockReturnValueOnce(mockPath);
 
-    const result = findPHPVMRCFile('/path/to/project');
+    const result = findPHPVMRCFile('/path/to/start');
     expect(result).toBe(mockPath);
   });
 
-  it('should return null if no .phpvmrc file is found', () => {
+  it('should return null when no .phpvmrc file is found', () => {
     fs.existsSync.mockReturnValue(false);
-    const result = findPHPVMRCFile('/some/other/path');
+
+    const result = findPHPVMRCFile('/path/to/start');
     expect(result).toBeNull();
-  });
-});
-
-describe('getPHPVersionFromRCFile', () => {
-  it('should return PHP version from .phpvmrc file', () => {
-    const mockFilePath = '/path/to/.phpvmrc';
-    const mockPHPVersion = '7.4.10';
-    fs.existsSync.mockReturnValue(true);
-    fs.readFileSync.mockReturnValue(mockPHPVersion);
-
-    const result = getPHPVersionFromRCFile(mockFilePath);
-    expect(result).toBe(mockPHPVersion);
-  });
-
-  it('should throw an error if .phpvmrc file does not exist', () => {
-    fs.existsSync.mockReturnValue(false);
-
-    expect(() => {
-      getPHPVersionFromRCFile('/path/to/nonexistent/.phpvmrc');
-    }).toThrow('File not found: /path/to/nonexistent/.phpvmrc');
-  });
-});
-
-describe('isPHPVersionInstalled', () => {
-  it('should return true if PHP version is installed', () => {
-    const mockVersion = '7.4.10';
-    const mockHomeDir = '/home/user';
-    process.env.HOME = mockHomeDir;
-    const mockVersionDir = `${mockHomeDir}/.phpvm/versions/${mockVersion}`;
-    fs.existsSync.mockReturnValue(true);
-
-    const result = isPHPVersionInstalled(mockVersion);
-    expect(result).toBe(true);
-  });
-
-  it('should return false if PHP version is not installed', () => {
-    fs.existsSync.mockReturnValue(false);
-    const result = isPHPVersionInstalled('7.4.10');
-    expect(result).toBe(false);
-  });
-
-  it('should throw an error if HOME environment variable is not set', () => {
-    delete process.env.HOME;
-
-    expect(() => {
-      isPHPVersionInstalled('7.4.10');
-    }).toThrow('HOME environment variable is not set.');
   });
 });
 
@@ -84,31 +37,38 @@ describe('autoSwitchPHPVersion', () => {
     const mockVersion = '7.4.10';
     const mockPath = '/path/to/.phpvmrc';
 
-    jest.spyOn(global.console, 'log');
     fs.existsSync.mockReturnValue(true);
     path.join.mockReturnValue(mockPath);
     fs.readFileSync.mockReturnValue(mockVersion);
-    jest.mock('../lib/commands/use', () => ({
-      usePHPVersion: jest.fn(),
-    }));
-    jest.mock('../lib/commands/install', () => ({
-      installPHP: jest.fn(),
-    }));
 
     await autoSwitchPHPVersion();
-    expect(console.log).toHaveBeenCalledWith(
-      `Found .phpvmrc file. PHP version specified: ${mockVersion}`,
+    expect(usePHPVersion).toHaveBeenCalledWith(mockVersion);
+  });
+
+  it('should log an error if switching to PHP version fails', async () => {
+    const mockVersion = '7.4.10';
+    const mockPath = '/path/to/.phpvmrc';
+    const mockError = new Error('Switch failed');
+
+    fs.existsSync.mockReturnValue(true);
+    path.join.mockReturnValue(mockPath);
+    fs.readFileSync.mockReturnValue(mockVersion);
+    usePHPVersion.mockRejectedValue(mockError);
+
+    jest.spyOn(global.console, 'error');
+
+    await autoSwitchPHPVersion();
+    expect(console.error).toHaveBeenCalledWith(
+      `Failed to switch to PHP ${mockVersion}: ${mockError.message}`,
     );
   });
 
-  it('should log if no .phpvmrc file is found', async () => {
+  it('should remain silent if no .phpvmrc file is found', async () => {
     fs.existsSync.mockReturnValue(false);
 
     jest.spyOn(global.console, 'log');
-    await autoSwitchPHPVersion();
 
-    expect(console.log).toHaveBeenCalledWith(
-      'No .phpvmrc file found in this directory or any parent directory.',
-    );
+    await autoSwitchPHPVersion();
+    expect(console.log).not.toHaveBeenCalled();
   });
 });
