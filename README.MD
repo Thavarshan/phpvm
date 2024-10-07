@@ -7,30 +7,6 @@
 [![Build](https://github.com/Thavarshan/phpvm/actions/workflows/use.yml/badge.svg?label=build&branch=main)](https://github.com/Thavarshan/phpvm/actions/workflows/use.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-## Table of Contents
-
-- [Introduction](#introduction)
-- [About phpvm](#about-phpvm)
-- [Installation](#installation)
-  - [Install & Update Script](#install--update-script)
-  - [Verify Installation](#verify-installation)
-  - [Manual Install](#manual-install)
-  - [Manual Update](#manual-update)
-- [Usage](#usage)
-  - [Installing PHP Versions](#installing-php-versions)
-  - [Switching PHP Versions](#switching-php-versions)
-  - [Uninstalling PHP Versions](#uninstalling-php-versions)
-  - [Listing Installed Versions](#listing-installed-versions)
-  - [Default Version](#default-version)
-  - [System PHP Version](#system-php-version)
-  - [Using a Mirror](#using-a-mirror)
-- [Running Tests](#running-tests)
-- [Uninstallation](#uninstallation)
-- [Troubleshooting](#troubleshooting)
-- [Maintainers](#maintainers)
-- [License](#license)
-- [Disclaimer](#disclaimer)
-
 ## Introduction
 
 `phpvm` is a PHP Version Manager that allows you to easily install, switch between, and manage multiple PHP versions via the command line.
@@ -46,10 +22,6 @@ $ phpvm use 8.0
 Now using PHP v8.0.8
 $ php -v
 PHP 8.0.8
-$ phpvm install 8.1
-Now using PHP v8.1.1
-$ php -v
-PHP 8.1.1
 ```
 
 ## About phpvm
@@ -59,11 +31,9 @@ PHP 8.1.1
 ### Key Features
 
 - Install and use different PHP versions.
-- Easily switch between PHP versions.
-- Manage global PHP settings and extensions.
-- Install PHP versions via package managers like `apt` or `brew`, or from source.
-- Auto-detect `.phpvmrc` files to switch PHP versions based on project configuration.
-- Supports Homebrew and Linux package managers, or installation from source for more advanced setups.
+- Easily switch between installed PHP versions.
+- List installed PHP versions.
+- Uninstall a specific PHP version.
 
 ## Installation
 
@@ -131,11 +101,7 @@ To install a specific version of PHP, run:
 phpvm install 8.1
 ```
 
-This will install PHP version 8.1. You can also install PHP using a package manager:
-
-```sh
-phpvm install --package-manager 7.4
-```
+This will install PHP version 8.1.
 
 ### Switching PHP Versions
 
@@ -170,46 +136,6 @@ phpvm list
 ```
 
 This will display all the PHP versions managed by `phpvm`.
-
-### Default Version
-
-To set the default PHP version for new shells, use:
-
-```sh
-phpvm alias default 8.0
-```
-
-This will ensure that PHP 8.0 is used as the default version whenever a new shell is opened.
-
-### System PHP Version
-
-To use the system-installed version of PHP:
-
-```sh
-phpvm use system
-```
-
-### Using a Mirror
-
-To use a mirror of PHP binaries, set the `PHPVM_MIRROR` environment variable:
-
-```sh
-export PHPVM_MIRROR=https://php-mirror-url.com
-phpvm install 8.0
-```
-
-### Auto-Switch PHP Version Using `.phpvmrc`
-
-If a `.phpvmrc` file is present in the directory, `phpvm` will automatically switch to the PHP version specified in the file. This allows seamless version switching when working on different projects that require different PHP versions.
-
-To set up the `.phpvmrc` file for your project, create a file with the following content:
-
-```sh
-# .phpvmrc
-8.0.8
-```
-
-When navigating to a directory with this file, `phpvm` will automatically switch to the specified PHP version.
 
 ## Running Tests
 
@@ -259,7 +185,3 @@ This project is licensed under the MIT License. See [LICENSE](./LICENSE) for mor
 `phpvm` is an open-source tool designed to simplify PHP version management. While we strive to ensure its functionality across different platforms and configurations, we make no warranties or guarantees regarding its accuracy, completeness, reliability, or suitability for any particular purpose.
 
 **Use at your own risk.** By using `phpvm`, you acknowledge that the developers and contributors are not responsible for any damages or data loss resulting from the installation, configuration, or use of this tool.
-
-We recommend reviewing the source code, running tests, and using the tool in a controlled environment before deploying it in production settings. Contributions are always welcome, but please ensure any changes are well-tested and follow best practices.
-
-If you encounter issues or need assistance, please open an issue on our GitHub repository, but note that support is offered as time and resources allow.
