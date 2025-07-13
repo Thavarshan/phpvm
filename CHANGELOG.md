@@ -1,5 +1,34 @@
 # Release Notes
 
+## [v1.4.1](https://github.com/Thavarshan/phpvm/compare/v1.4.0...v1.4.1) - 2025-07-13
+
+### Fixed
+
+- **Fixed script execution detection failing on macOS/zsh:** Resolved critical issue where `phpvm` commands (`help`, `list`, `use`, etc.) would run silently without any output on macOS systems using zsh shell, making the tool appear completely non-functional.
+- **Fixed execution detection logic in `phpvm_should_execute_main()`:** The original detection method incorrectly identified script execution as "sourcing" on macOS/zsh environments, causing the script to only load functions without executing the main command handler.
+- **Enhanced shell compatibility with argument-based detection:** Added more reliable execution detection by checking for script arguments as the primary indicator, with the original `return` test maintained as fallback for POSIX shell compatibility.
+- **Improved detection layer ordering:** Reorganized execution detection logic to prioritize more reliable methods (argument presence) over shell-specific tests that behave inconsistently across different environments.
+
+## [v1.4.0](https://github.com/Thavarshan/phpvm/compare/v1.3.0...v1.4.0) - 2025-06-23
+
+### Added
+
+- **Added comprehensive uninstall functionality:** Implemented `phpvm uninstall` command to completely remove phpvm from the system, including cleaning up shell profile modifications and removing all installed PHP versions.
+- **Added VSCode development settings:** Included VSCode workspace configuration and settings for improved development experience and consistency across contributors.
+- **Added enhanced POSIX compliance:** Improved shell script compatibility across different Unix-like systems and shell environments for better portability.
+
+### Changed
+
+- **Enhanced shell profile management:** Improved detection and modification of shell configuration files (.bashrc, .zshrc, .profile) for more reliable setup and removal processes.
+- **Improved cross-platform compatibility:** Enhanced script behavior to work more consistently across different operating systems and shell environments.
+- **Strengthened code quality:** Multiple refinements to shell scripting practices for better POSIX compliance and reduced platform-specific issues.
+
+### Fixed
+
+- **Fixed POSIX compliance issues:** Resolved shell scripting compatibility problems that could cause issues on certain Unix systems or when using different shell interpreters.
+- **Fixed installation/uninstallation edge cases:** Improved handling of various system configurations during installation and uninstallation processes.
+- **Enhanced error handling during cleanup operations:** Better error reporting and recovery when removing phpvm components from the system.
+
 ## [v1.3.0](https://github.com/Thavarshan/phpvm/compare/v1.2.0...v1.3.0) - 2025-05-11
 
 ## Added
