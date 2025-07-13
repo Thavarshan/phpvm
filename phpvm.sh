@@ -931,7 +931,13 @@ phpvm_should_execute_main() {
     # Layer 2: Test mode
     [ "$PHPVM_TEST_MODE" = "true" ] && return 1
 
-    # Layer 3: Return test (most reliable POSIX method)
+    # Layer 3: Check if script has arguments (most reliable indicator)
+    # If script is called with arguments, it's likely being executed
+    if [ $# -gt 0 ]; then
+        return 0 # Execute
+    fi
+
+    # Layer 4: Return test (fallback for POSIX shells)
     if (return 0 2>/dev/null); then
         return 1 # Sourced
     else
