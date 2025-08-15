@@ -408,7 +408,7 @@ list_installed_versions() {
         echo "  system (Homebrew default PHP)"
         ;;
     apt)
-        dpkg-query -W -f='${Package}\n' | grep -E '^php[0-9]+\.[0-9]+' | sed 's/^php//;s/-.*$//' | awk '{print "  "$1}'
+        dpkg-query -W -f='${Package}\n' | grep -E '^php[0-9]+\.[0-9]+' | sed 's/^php//' | awk '{print "  "$1}'
         echo "  system (default system PHP)"
         ;;
     dnf | yum)
