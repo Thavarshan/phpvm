@@ -77,15 +77,15 @@ jobs:
       - name: Test cURL Installation
         run: |
           echo "=== Testing cURL Installation Method ==="
-          
+
           # Create temporary directory for testing
           TEST_HOME=$(mktemp -d)
           export HOME="$TEST_HOME"
           export PHPVM_DIR="$TEST_HOME/.phpvm"
-          
+
           # Test installation
           curl -o- https://raw.githubusercontent.com/Thavarshan/phpvm/main/install.sh | bash
-          
+
           # Verify installation
           if [ -f "$PHPVM_DIR/phpvm.sh" ]; then
             echo "✅ cURL installation successful"
@@ -99,15 +99,15 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           echo "=== Testing wget Installation Method ==="
-          
+
           # Create temporary directory for testing
           TEST_HOME=$(mktemp -d)
           export HOME="$TEST_HOME"
           export PHPVM_DIR="$TEST_HOME/.phpvm"
-          
+
           # Test installation
           wget -qO- https://raw.githubusercontent.com/Thavarshan/phpvm/main/install.sh | bash
-          
+
           # Verify installation
           if [ -f "$PHPVM_DIR/phpvm.sh" ]; then
             echo "✅ wget installation successful"
@@ -144,7 +144,7 @@ jobs:
           if [[ "${{ runner.os }}" == "Linux" ]]; then
             eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
           fi
-          
+
           echo "=== Testing PHP Installation ==="
           ./phpvm.sh install 8.3 || echo "PHP 8.3 installation attempted"
 
@@ -153,7 +153,7 @@ jobs:
           if [[ "${{ runner.os }}" == "Linux" ]]; then
             eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
           fi
-          
+
           echo "=== Testing Version Operations ==="
           ./phpvm.sh use 8.3 || echo "Switch to 8.3 attempted"
           ./phpvm.sh list
@@ -164,7 +164,7 @@ jobs:
           if [[ "${{ runner.os }}" == "Linux" ]]; then
             eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
           fi
-          
+
           echo "=== Testing Project Auto-Switch ==="
           mkdir -p test_project
           echo "8.3" > test_project/.phpvmrc
@@ -177,7 +177,7 @@ jobs:
           if [[ "${{ runner.os }}" == "Linux" ]]; then
             eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
           fi
-          
+
           echo "=== Final Verification ==="
           php -v 2>/dev/null || echo "PHP not currently active (expected in test environment)"
           ./phpvm.sh list
