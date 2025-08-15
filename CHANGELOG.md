@@ -1,5 +1,29 @@
 # Release Notes
 
+## [v1.5.0](https://github.com/Thavarshan/phpvm/compare/v1.4.1...v1.5.0) - 2025-08-15
+
+### Added
+
+- **Added comprehensive version command support:** Implemented `phpvm version`, `phpvm --version`, and `phpvm -v` commands with detailed information including author, repository link, and usage hints.
+- **Added intelligent system PHP detection:** Enhanced system PHP switching to properly detect and use Homebrew's main `php` formula as the system default on modern macOS.
+- **Added post-install validation:** Added checks for PHP binary availability after installation with helpful warnings if binaries are missing.
+
+### Changed
+
+- **Improved shebang for WSL compatibility:** Changed from `#!/bin/sh` to `#!/bin/bash` for better compatibility with WSL and Linux distributions.
+- **Enhanced Homebrew link failure detection:** Improved detection and handling of "already linked" warnings from Homebrew with proper error reporting and user guidance.
+- **Updated system PHP messaging:** Changed misleading "macOS built-in PHP" references to accurate "Homebrew default PHP" messaging that reflects modern macOS reality.
+- **Improved PHP version detection on Linux:** Enhanced `dpkg-query` usage for more reliable PHP version listing on Debian/Ubuntu systems.
+- **Enhanced unlinking logic:** Replaced problematic wildcard unlinking with proper iteration through installed PHP formulas.
+
+### Fixed
+
+- **Fixed false success reporting on Homebrew link failures:** Script now properly detects when `brew link` fails due to "already linked" status and returns error instead of false success.
+- **Fixed WSL script execution issues:** Resolved problem where phpvm would exit silently without output on WSL/Ubuntu systems due to shell compatibility issues.
+- **Fixed system PHP switching on macOS:** System switching now correctly links to Homebrew's main PHP installation instead of looking for non-existent `/usr/bin/php`.
+- **Fixed PHP version listing on Linux:** Improved reliability of `phpvm list` command showing installed PHP versions on apt-based systems.
+- **Fixed error handling for missing PHP binaries:** Added proper error handling when PHP commands are not available, preventing script crashes.
+
 ## [v1.4.1](https://github.com/Thavarshan/phpvm/compare/v1.4.0...v1.4.1) - 2025-07-13
 
 ### Fixed

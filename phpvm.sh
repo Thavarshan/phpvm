@@ -1,7 +1,10 @@
-#!/bin/sh
+#!/bin/bash
 
 # phpvm - A PHP Version Manager for macOS and Linux
 # Author: Jerome Thayananthajothy (tjthavarshan@gmail.com)
+# Version: 1.5.0
+
+PHPVM_VERSION="1.5.0"
 
 # Define a debug mode for testing
 if [ "${BATS_TEST_FILENAME:-}" != "" ]; then
@@ -134,6 +137,10 @@ install_php() {
             phpvm_err "Failed to install PHP $version. Package php$version may not exist."
             return 1
         fi
+        # Post-install check for binary
+        if ! [ -x "/usr/bin/php$version" ]; then
+            phpvm_warn "php$version installed, but /usr/bin/php$version not found. You may need to install php$version-cli or check your PATH."
+        fi
         ;;
     dnf | yum)
         run_with_sudo $PKG_MANAGER install -y php"$version" || {
@@ -166,8 +173,10 @@ get_installed_php_version() {
 
     if command -v php-config >/dev/null 2>&1; then
         php-config --version
-    else
+    elif command -v php >/dev/null 2>&1; then
         php -v | awk '/^PHP/ {print $2}'
+    else
+        echo "N/A"
     fi
 }
 
@@ -203,21 +212,49 @@ use_php_version() {
     brew)
         phpvm_debug "Unlinking any existing PHP version..."
         brew unlink php >/dev/null 2>&1 || true
-        brew unlink php@*.* >/dev/null 2>&1 || true
+        # Unlink all versioned PHP installations
+        for php_formula in $(brew list --formula | grep -E '^php@[0-9]+\.[0-9]+$'); do
+            brew unlink "$php_formula" >/dev/null 2>&1 || true
+        done
 
         if [ "$version" = "system" ]; then
             # Special case for switching to system PHP
             echo "system" >"$PHPVM_ACTIVE_VERSION_FILE"
-            phpvm_echo "Switched to system PHP."
-            return 0
+            # Remove the current symlink since we're using system PHP
+            rm -f "$PHPVM_CURRENT_SYMLINK"
+
+            # On macOS, "system" PHP typically means the main Homebrew php formula
+            # since Apple removed PHP from macOS starting with macOS Monterey 12.0
+            if [ -d "$HOMEBREW_PREFIX/Cellar/php" ]; then
+                phpvm_debug "Linking Homebrew php formula as system default..."
+                brew link php --force --overwrite >/dev/null 2>&1 || {
+                    phpvm_err "Failed to link Homebrew php formula."
+                    return 1
+                }
+                phpvm_echo "Switched to system PHP (Homebrew default)."
+                return 0
+            # Fallback: check for any system PHP in standard locations (rare on modern macOS)
+            elif command -v php >/dev/null 2>&1; then
+                phpvm_echo "Switched to system PHP."
+                return 0
+            else
+                phpvm_echo "Switched to system PHP."
+                phpvm_warn "No system PHP found. You may need to install PHP with 'brew install php' or switch to a specific version."
+                return 0
+            fi
         fi
 
         if [ -d "$HOMEBREW_PREFIX/Cellar/php@$version" ]; then
             phpvm_debug "Linking PHP $version..."
-            brew link php@"$version" --force --overwrite || {
-                phpvm_err "Failed to link PHP $version."
+            link_output=$(brew link php@"$version" --force --overwrite 2>&1)
+            if echo "$link_output" | grep -iq "Already linked"; then
+                phpvm_warn "Homebrew reports PHP $version is already linked. To relink, run: brew unlink php@${version} && brew link --force php@${version}"
+                phpvm_warn "Switch NOT completed. Please relink manually."
                 return 1
-            }
+            elif echo "$link_output" | grep -q "Error"; then
+                phpvm_err "Failed to link PHP $version: $link_output"
+                return 1
+            fi
         elif [ -d "$HOMEBREW_PREFIX/Cellar/php" ]; then
             installed_version=$(get_installed_php_version)
             if [ "$installed_version" = "$version" ]; then
@@ -340,7 +377,7 @@ list_installed_versions() {
                 fi
             fi
         done
-        echo "  system (macOS built-in PHP)"
+        echo "  system (Homebrew default PHP)"
         echo ""
         if [ -f "$PHPVM_ACTIVE_VERSION_FILE" ]; then
             active_version=$(cat "$PHPVM_ACTIVE_VERSION_FILE")
@@ -368,10 +405,10 @@ list_installed_versions() {
                 fi
             done
         fi
-        echo "  system (macOS built-in PHP)"
+        echo "  system (Homebrew default PHP)"
         ;;
     apt)
-        dpkg -l | grep -E '^ii +php[0-9]+\.[0-9]+' | awk '{print "  " $2}' | sed 's/^  php//'
+        dpkg-query -W -f='${Package}\n' | grep -E '^php[0-9]+\.[0-9]+' | sed 's/^php//' | awk '{print "  "$1}'
         echo "  system (default system PHP)"
         ;;
     dnf | yum)
@@ -406,12 +443,26 @@ Usage:
   phpvm list               List installed PHP versions
   phpvm help               Show this help message
   phpvm test               Run self-tests to verify functionality
+  phpvm version            Show version information
 
 Examples:
   phpvm install 8.1        Install PHP 8.1
   phpvm use 7.4            Switch to PHP 7.4
   phpvm system             Switch to system PHP version
   phpvm auto               Auto-switch based on current directory
+EOF
+}
+
+# Print version information
+print_version() {
+    cat <<EOF
+phpvm version $PHPVM_VERSION
+
+PHP Version Manager for macOS and Linux
+Author: Jerome Thayananthajothy <tjthavarshan@gmail.com>
+Repository: https://github.com/Thavarshan/phpvm
+
+Usage: phpvm help
 EOF
 }
 
@@ -908,6 +959,9 @@ main() {
         ;;
     help)
         print_help
+        ;;
+    version | --version | -v)
+        print_version
         ;;
     test)
         run_tests
