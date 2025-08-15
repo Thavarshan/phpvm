@@ -21,13 +21,13 @@ jobs:
       - name: Validate Release Version
         run: |
           echo "=== Validating Release Version ==="
-          
+
           chmod +x ./phpvm.sh
-          
+
           # Check version output
           VERSION_OUTPUT=$(./phpvm.sh version)
           echo "Version output: $VERSION_OUTPUT"
-          
+
           if echo "$VERSION_OUTPUT" | grep -q "phpvm version"; then
             echo "✅ Version output format is correct"
           else
@@ -38,42 +38,42 @@ jobs:
       - name: Test Core Functionality
         run: |
           echo "=== Testing Core Functionality ==="
-          
+
           ./phpvm.sh version
           ./phpvm.sh help
           ./phpvm.sh list
           ./phpvm.sh test
-          
+
           echo "✅ All core commands work"
 
       - name: Performance Check
         run: |
           echo "=== Performance Check ==="
-          
+
           time ./phpvm.sh version >/dev/null
           time ./phpvm.sh help >/dev/null
-          
+
           echo "✅ Performance check completed"
 
       - name: Documentation Check
         if: runner.os == 'Linux'
         run: |
           echo "=== Documentation Check ==="
-          
+
           # Check that README contains key commands
           if grep -q "phpvm version" README.MD; then
             echo "✅ README contains version command documentation"
           else
             echo "⚠️  README might be missing version command documentation"
           fi
-          
+
           if grep -q "phpvm install" README.MD; then
             echo "✅ README contains install command documentation"
           else
             echo "❌ README missing install command documentation"
             exit 1
           fi
-          
+
           # Check changelog exists
           if [ -f CHANGELOG.md ]; then
             echo "✅ Changelog file exists"
@@ -81,5 +81,5 @@ jobs:
             echo "❌ Changelog file missing"
             exit 1
           fi
-          
+
           echo "✅ Documentation check completed"

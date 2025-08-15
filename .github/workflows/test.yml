@@ -74,7 +74,7 @@ jobs:
           echo "=== Testing Version Commands ==="
           ./phpvm.sh version
           echo ""
-          ./phpvm.sh --version  
+          ./phpvm.sh --version
           echo ""
           ./phpvm.sh -v
           echo "✅ All version commands work"
@@ -98,7 +98,7 @@ jobs:
       - name: Test Error Handling
         run: |
           echo "=== Testing Error Handling ==="
-          
+
           # Test invalid command
           if ./phpvm.sh invalid_command 2>/dev/null; then
             echo "❌ Should have failed on invalid command"
@@ -106,7 +106,7 @@ jobs:
           else
             echo "✅ Correctly handles invalid commands"
           fi
-          
+
           # Test missing version parameter
           if ./phpvm.sh use 2>/dev/null; then
             echo "❌ Should have failed on missing version"
@@ -114,7 +114,7 @@ jobs:
           else
             echo "✅ Correctly handles missing version parameter"
           fi
-          
+
           echo "✅ Error handling tests completed"
 
       # Test .phpvmrc functionality
@@ -123,12 +123,12 @@ jobs:
           echo "=== Testing .phpvmrc Auto-Switch ==="
           mkdir -p test_project
           echo "8.3" > test_project/.phpvmrc
-          
+
           cd test_project
           if [[ "${{ runner.os }}" == "Linux" ]]; then
             eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" 2>/dev/null || true
           fi
-          
+
           ../phpvm.sh auto || echo "Auto-switch attempted"
           cd ..
           echo "✅ Auto-switch test completed"

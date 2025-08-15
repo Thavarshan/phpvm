@@ -29,25 +29,25 @@ jobs:
         run: |
           chmod +x phpvm.sh
           eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-          
+
           echo "=== Testing PHP Installation ==="
           ./phpvm.sh install 8.3 || echo "PHP 8.3 installation attempted"
 
       - name: Test PHP Version Switching
         run: |
           eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-          
+
           echo "=== Testing Version Switching ==="
           ./phpvm.sh use 8.3 || echo "Switch to 8.3 attempted"
           ./phpvm.sh list
-          
+
           echo "=== Testing System Switch ==="
           ./phpvm.sh system || echo "System switch attempted"
 
       - name: Test Project-based Auto-Switch
         run: |
           eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-          
+
           echo "=== Testing Project Auto-Switch ==="
           mkdir -p test_project
           echo "8.3" > test_project/.phpvmrc
@@ -58,10 +58,10 @@ jobs:
       - name: Verify PHP Functionality
         run: |
           eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-          
+
           echo "=== Verifying PHP Functionality ==="
           php -v 2>/dev/null || echo "PHP not currently active (expected in test environment)"
-          
+
           echo "=== Final Status ==="
           ./phpvm.sh list
 
@@ -77,15 +77,15 @@ jobs:
       - name: Test cURL Installation
         run: |
           echo "=== Testing cURL Installation Method ==="
-          
+
           # Create temporary directory for testing
           TEST_HOME=$(mktemp -d)
           export HOME="$TEST_HOME"
           export PHPVM_DIR="$TEST_HOME/.phpvm"
-          
+
           # Test installation
           curl -o- https://raw.githubusercontent.com/Thavarshan/phpvm/main/install.sh | bash
-          
+
           # Verify installation
           if [ -f "$PHPVM_DIR/phpvm.sh" ]; then
             echo "✅ cURL installation successful"
@@ -99,15 +99,15 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           echo "=== Testing wget Installation Method ==="
-          
+
           # Create temporary directory for testing
           TEST_HOME=$(mktemp -d)
           export HOME="$TEST_HOME"
           export PHPVM_DIR="$TEST_HOME/.phpvm"
-          
+
           # Test installation
           wget -qO- https://raw.githubusercontent.com/Thavarshan/phpvm/main/install.sh | bash
-          
+
           # Verify installation
           if [ -f "$PHPVM_DIR/phpvm.sh" ]; then
             echo "✅ wget installation successful"
