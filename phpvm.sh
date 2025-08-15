@@ -247,7 +247,7 @@ use_php_version() {
         if [ -d "$HOMEBREW_PREFIX/Cellar/php@$version" ]; then
             phpvm_debug "Linking PHP $version..."
             link_output=$(brew link php@"$version" --force --overwrite 2>&1)
-            if echo "$link_output" | grep -q "Already linked"; then
+            if echo "$link_output" | grep -iq "Already linked"; then
                 phpvm_warn "Homebrew reports PHP $version is already linked. To relink, run: brew unlink php@${version} && brew link --force php@${version}"
                 phpvm_warn "Switch NOT completed. Please relink manually."
                 return 1
