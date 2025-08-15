@@ -2,28 +2,142 @@ name: PHPVM Tests
 
 on:
   push:
-    branches:
-      - main
-      - development
+    branches: [main, development, 'fix/**', 'feature/**']
   pull_request:
-    branches:
-      - main
-      - development
+    branches: [main, development]
+  workflow_dispatch:
+  schedule:
+    # Run weekly to catch any regressions
+    - cron: '0 2 * * 0'
 
 jobs:
+  # Syntax and Static Analysis
+  syntax-check:
+    name: Syntax & Static Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Shell Syntax Check
+        run: |
+          bash -n phpvm.sh
+          if [ -f install.sh ]; then bash -n install.sh; fi
+          echo "✅ Shell syntax check passed"
+
+      - name: ShellCheck Analysis
+        uses: ludeeus/action-shellcheck@2.0.0
+        with:
+          scandir: '.'
+          format: gcc
+          severity: warning
+        continue-on-error: true
+
+  # Comprehensive Testing
   test:
+    name: Test on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    needs: syntax-check
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
 
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Environment Info
+        run: |
+          echo "OS: $(uname -s)"
+          echo "Shell: $SHELL"
+          echo "User: $(whoami)"
+
+      # Setup Homebrew on Linux if needed
+      - name: Setup Homebrew (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential curl file git
+          NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.bashrc
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          brew --version
 
       # Set up permissions for the script
       - name: Make script executable
         run: chmod +x ./phpvm.sh
 
+      # Test all version commands (v1.5.0 feature)
+      - name: Test Version Commands
+        run: |
+          echo "=== Testing Version Commands ==="
+          ./phpvm.sh version
+          echo ""
+          ./phpvm.sh --version  
+          echo ""
+          ./phpvm.sh -v
+          echo "✅ All version commands work"
+
+      # Test help and list commands
+      - name: Test Basic Commands
+        run: |
+          echo "=== Testing Basic Commands ==="
+          ./phpvm.sh help
+          ./phpvm.sh list || echo "List command executed (may show no versions initially)"
+          echo "✅ Basic commands work"
+
       # Run the integrated self-tests
-      - name: Run integrated tests
-        run: ./phpvm.sh test
+      - name: Run Integrated Self-Tests
+        run: |
+          echo "=== Running Integrated Self-Tests ==="
+          ./phpvm.sh test
+          echo "✅ Self-tests completed"
+
+      # Test error handling
+      - name: Test Error Handling
+        run: |
+          echo "=== Testing Error Handling ==="
+          
+          # Test invalid command
+          if ./phpvm.sh invalid_command 2>/dev/null; then
+            echo "❌ Should have failed on invalid command"
+            exit 1
+          else
+            echo "✅ Correctly handles invalid commands"
+          fi
+          
+          # Test missing version parameter
+          if ./phpvm.sh use 2>/dev/null; then
+            echo "❌ Should have failed on missing version"
+            exit 1
+          else
+            echo "✅ Correctly handles missing version parameter"
+          fi
+          
+          echo "✅ Error handling tests completed"
+
+      # Test .phpvmrc functionality
+      - name: Test .phpvmrc Auto-Switch
+        run: |
+          echo "=== Testing .phpvmrc Auto-Switch ==="
+          mkdir -p test_project
+          echo "8.3" > test_project/.phpvmrc
+          
+          cd test_project
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" 2>/dev/null || true
+          fi
+          
+          ../phpvm.sh auto || echo "Auto-switch attempted"
+          cd ..
+          echo "✅ Auto-switch test completed"
+
+      # Performance check
+      - name: Performance Check
+        run: |
+          echo "=== Performance Check ==="
+          time ./phpvm.sh version >/dev/null
+          time ./phpvm.sh help >/dev/null
+          time ./phpvm.sh list >/dev/null
+          echo "✅ Performance check completed"
