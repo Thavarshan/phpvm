@@ -6,9 +6,6 @@ on:
   pull_request:
     branches: [main, development]
   workflow_dispatch:
-  schedule:
-    # Run weekly to catch any regressions
-    - cron: '0 2 * * 0'
 
 jobs:
   # Syntax and Static Analysis
