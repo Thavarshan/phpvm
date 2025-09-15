@@ -1,6 +1,6 @@
 # Release Notes
 
-## [v1.6.0] - 2025-09-15
+## [v1.6.0](https://github.com/Thavarshan/phpvm/compare/v1.5.0...v1.6.0) - 2025-09-15
 
 ### Added
 
