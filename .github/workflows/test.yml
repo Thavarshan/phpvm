@@ -279,7 +279,13 @@ jobs:
 
       - name: Run Extended Tests in Container
         run: |
-          docker run --rm -v $PWD:/workspace -w /workspace ${{ matrix.distro }} bash -c "
+          # Use sh for Alpine Linux (bash not available by default), bash for others
+          if [[ "${{ matrix.distro }}" == alpine* ]]; then
+            SHELL_CMD="sh"
+          else
+            SHELL_CMD="bash"
+          fi
+          docker run --rm -v $PWD:/workspace -w /workspace ${{ matrix.distro }} $SHELL_CMD -c "
             set -e
 
             echo '=== Setting up ${{ matrix.scenario }} ==='
@@ -293,7 +299,8 @@ jobs:
                 ;;
               dnf)
                 dnf update -y
-                dnf install -y curl wget sudo procps grep sed gawk coreutils which
+                # Use --allowerasing to handle coreutils conflicts in RHEL/Rocky/Alma
+                dnf install -y --allowerasing curl wget sudo procps grep sed gawk coreutils which
                 ;;
               pacman)
                 pacman -Sy --noconfirm
@@ -301,7 +308,8 @@ jobs:
                 ;;
               apk)
                 apk update
-                apk add curl wget sudo procps grep sed gawk coreutils bash
+                # Install bash and other essential tools for Alpine
+                apk add bash curl wget sudo procps grep sed gawk coreutils
                 ;;
             esac
 
