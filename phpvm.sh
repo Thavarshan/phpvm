@@ -2,9 +2,9 @@
 
 # phpvm - A PHP Version Manager for macOS and Linux
 # Author: Jerome Thayananthajothy (tjthavarshan@gmail.com)
-# Version: 1.5.0
+# Version: 1.6.0
 
-PHPVM_VERSION="1.5.0"
+PHPVM_VERSION="1.6.0"
 
 # Define a debug mode for testing
 if [ "${BATS_TEST_FILENAME:-}" != "" ]; then
@@ -264,6 +264,109 @@ validate_php_version() {
     return 1
 }
 
+# Check if Remi repository is available/enabled for RHEL/Fedora systems
+check_remi_repository() {
+    # Check if Remi repository is installed
+    if command -v dnf >/dev/null 2>&1; then
+        dnf repolist enabled 2>/dev/null | grep -q remi
+    elif command -v yum >/dev/null 2>&1; then
+        yum repolist enabled 2>/dev/null | grep -q remi
+    else
+        return 1
+    fi
+}
+
+# Detect if PHP packages are available in current repositories
+detect_php_availability() {
+    version="$1"
+
+    case "$PKG_MANAGER" in
+    dnf)
+        if dnf search "php$version" 2>/dev/null | grep -q "php$version"; then
+            return 0
+        elif dnf search "php" 2>/dev/null | grep -q "php[0-9]"; then
+            # Some PHP packages exist, but not the requested version
+            return 2
+        else
+            # No PHP packages found at all
+            return 1
+        fi
+        ;;
+    yum)
+        if yum search "php$version" 2>/dev/null | grep -q "php$version"; then
+            return 0
+        elif yum search "php" 2>/dev/null | grep -q "php[0-9]"; then
+            return 2
+        else
+            return 1
+        fi
+        ;;
+    apt)
+        if apt-cache search "php$version" 2>/dev/null | grep -q "php$version"; then
+            return 0
+        else
+            return 1
+        fi
+        ;;
+    *)
+        # For other package managers, assume available
+        return 0
+        ;;
+    esac
+}
+
+# Provide repository setup suggestions for RHEL/Fedora systems
+suggest_repository_setup() {
+    version="$1"
+
+    if [ "$PKG_MANAGER" = "dnf" ] || [ "$PKG_MANAGER" = "yum" ]; then
+        if [ "$LINUX_DISTRO" = "fedora" ]; then
+            phpvm_echo ""
+            phpvm_echo "PHP packages not found in default Fedora repositories."
+            phpvm_echo "To install PHP $version, you need to enable Remi's repository:"
+            phpvm_echo ""
+            phpvm_echo "  # Install Remi's repository"
+            if [ -n "$LINUX_VERSION" ]; then
+                phpvm_echo "  sudo dnf install https://rpms.remirepo.net/fedora/remi-release-$LINUX_VERSION.rpm"
+            else
+                phpvm_echo "  sudo dnf install https://rpms.remirepo.net/fedora/remi-release-42.rpm"
+            fi
+            phpvm_echo ""
+            phpvm_echo "  # Enable the repository"
+            phpvm_echo "  sudo dnf config-manager --set-enabled remi"
+            phpvm_echo ""
+            phpvm_echo "  # Enable specific PHP version repository"
+            major_minor=$(echo "$version" | cut -d. -f1,2 | tr -d '.')
+            phpvm_echo "  sudo dnf config-manager --set-enabled remi-php$major_minor"
+            phpvm_echo ""
+            phpvm_echo "After setting up the repository, try: phpvm install $version"
+
+        elif [ "$LINUX_DISTRO" = "rhel" ] || [ "$LINUX_DISTRO" = "rocky" ] || [ "$LINUX_DISTRO" = "almalinux" ] || [ "$LINUX_DISTRO" = "centos" ]; then
+            phpvm_echo ""
+            phpvm_echo "PHP packages not found in default RHEL/CentOS repositories."
+            phpvm_echo "To install PHP $version, you need to enable EPEL and Remi repositories:"
+            phpvm_echo ""
+            phpvm_echo "  # Install EPEL repository"
+            phpvm_echo "  sudo dnf install epel-release"
+            phpvm_echo ""
+            phpvm_echo "  # Install Remi's repository"
+            if [ -n "$LINUX_VERSION" ]; then
+                major_version=$(echo "$LINUX_VERSION" | cut -d. -f1)
+                phpvm_echo "  sudo dnf install https://rpms.remirepo.net/enterprise/remi-release-$major_version.rpm"
+            else
+                phpvm_echo "  sudo dnf install https://rpms.remirepo.net/enterprise/remi-release-9.rpm"
+            fi
+            phpvm_echo ""
+            phpvm_echo "  # Enable the repositories"
+            phpvm_echo "  sudo dnf config-manager --set-enabled remi"
+            major_minor=$(echo "$version" | cut -d. -f1,2 | tr -d '.')
+            phpvm_echo "  sudo dnf config-manager --set-enabled remi-php$major_minor"
+            phpvm_echo ""
+            phpvm_echo "After setting up the repositories, try: phpvm install $version"
+        fi
+    fi
+}
+
 # Install PHP using the detected package manager
 install_php() {
     version="$1"
@@ -357,18 +460,51 @@ install_php() {
         ;;
     dnf)
         # Fedora/RHEL 8+ with dnf
+        # First, check if PHP packages are available
+        detect_php_availability "$version"
+        availability_status=$?
+
+        if [ $availability_status -eq 1 ]; then
+            # No PHP packages found - suggest repository setup
+            phpvm_err "PHP packages not found in current repositories."
+            suggest_repository_setup "$version"
+            return 1
+        elif [ $availability_status -eq 2 ]; then
+            # Some PHP packages exist, but not the requested version
+            phpvm_warn "PHP $version not found, but other PHP versions are available."
+            phpvm_echo "Available PHP packages:"
+            dnf search php 2>/dev/null | grep "^php[0-9]" | head -5
+            phpvm_echo ""
+            if ! check_remi_repository; then
+                phpvm_echo "For more PHP versions, consider enabling Remi's repository:"
+                suggest_repository_setup "$version"
+            fi
+            return 1
+        fi
+
+        # Packages are available, proceed with installation
         if [ "$LINUX_DISTRO" = "fedora" ]; then
             # Fedora uses different PHP packages
             if ! run_with_sudo dnf install -y php"$version" php"$version"-cli; then
-                phpvm_err "Failed to install PHP $version. Package php$version may not exist."
-                phpvm_warn "Check available versions with: dnf search php"
+                phpvm_err "Failed to install PHP $version."
+                # Check if Remi repository might help
+                if ! check_remi_repository; then
+                    phpvm_echo ""
+                    phpvm_echo "If the package wasn't found, you might need Remi's repository:"
+                    suggest_repository_setup "$version"
+                fi
                 return 1
             fi
         else
             # RHEL/CentOS with dnf
             if ! run_with_sudo dnf install -y php"$version"; then
-                phpvm_err "Failed to install PHP $version. Package php$version may not exist."
-                phpvm_warn "You may need to enable EPEL or Remi repository"
+                phpvm_err "Failed to install PHP $version."
+                # Check if repositories might help
+                if ! check_remi_repository; then
+                    phpvm_echo ""
+                    phpvm_echo "You may need to enable additional repositories:"
+                    suggest_repository_setup "$version"
+                fi
                 return 1
             fi
         fi
@@ -382,10 +518,32 @@ install_php() {
             fi
         fi
 
+        # Check PHP availability first
+        detect_php_availability "$version"
+        availability_status=$?
+
+        if [ $availability_status -eq 1 ]; then
+            # No PHP packages found - suggest repository setup
+            phpvm_err "PHP packages not found in current repositories."
+            suggest_repository_setup "$version"
+            return 1
+        elif [ $availability_status -eq 2 ]; then
+            # Some PHP packages exist, but not the requested version
+            phpvm_warn "PHP $version not found, but other PHP versions are available."
+            if ! check_remi_repository; then
+                phpvm_echo "For more PHP versions, consider enabling Remi's repository:"
+                suggest_repository_setup "$version"
+            fi
+            return 1
+        fi
+
         if ! run_with_sudo yum install -y php"$version"; then
-            phpvm_err "Failed to install PHP $version. Package php$version may not exist."
-            phpvm_warn "Consider enabling EPEL: sudo yum install epel-release"
-            phpvm_warn "Consider enabling Remi: sudo yum install https://rpms.remirepo.net/enterprise/remi-release-7.rpm"
+            phpvm_err "Failed to install PHP $version."
+            if ! check_remi_repository; then
+                phpvm_echo ""
+                phpvm_echo "You may need to enable additional repositories:"
+                suggest_repository_setup "$version"
+            fi
             return 1
         fi
         ;;

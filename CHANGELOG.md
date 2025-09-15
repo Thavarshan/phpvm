@@ -2,12 +2,19 @@
 
 ## [v1.6.0] - 2025-09-15
 
+### Added
+
+- **Smart repository detection:** Added intelligent detection of missing PHP repositories on RHEL/Fedora systems with automatic suggestions for enabling Remi's repository.
+- **Enhanced error messaging:** Implemented comprehensive error handling with actionable solutions when PHP packages are not found in default repositories.
+- **Repository setup guidance:** Added detailed step-by-step instructions for enabling EPEL and Remi repositories on Fedora, RHEL, Rocky Linux, AlmaLinux, and CentOS systems.
+
 ### Changed
 
 - **Consolidated GitHub Actions workflows:** Streamlined CI/CD from 7 separate workflow files down to 3 focused workflows, eliminating duplication while maintaining comprehensive test coverage.
 - **Enhanced multi-distribution testing:** Expanded automated testing to cover 13 Linux distributions (Ubuntu, Debian, Fedora, Rocky Linux, AlmaLinux, Arch Linux, Alpine Linux) with 4 different package managers (apt, dnf, pacman, apk).
 - **Improved cross-platform compatibility:** Fixed package installation issues for RHEL-family distributions (Rocky/Alma Linux) and Alpine Linux in CI environments.
 - **Streamlined workflow organization:** Reorganized tests into logical categories: syntax analysis, core functionality, PHP usage, multi-distribution compatibility, performance testing, and end-to-end integration.
+- **Intelligent PHP installation:** Enhanced PHP installation process to check package availability before attempting installation and provide specific guidance when packages are missing.
 
 ### Fixed
 

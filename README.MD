@@ -41,11 +41,13 @@ PHP 8.1.13
 - Seamlessly switch between installed PHP versions.
 - Auto-switch PHP versions based on project `.phpvmrc`.
 - Supports macOS (via Homebrew) and Linux distributions including WSL.
+- **Smart repository detection** for RHEL/Fedora systems with automatic setup guidance.
+- **Enhanced error handling** with actionable solutions when PHP packages are missing.
+- **Intelligent package availability checking** before attempting installations.
 - Enhanced cross-platform compatibility with improved shell support.
 - Works with common shells (`bash`, `zsh`).
 - Comprehensive version commands (`phpvm version`, `phpvm --version`, `phpvm -v`).
 - Post-install validation with helpful warnings for missing binaries.
-- Improved error handling with detailed messages and suggestions.
 - Enhanced Homebrew integration with better link failure detection.
 - Informative, color-coded feedback with timestamps for logs.
 - Includes unit tests with BATS for automated testing.
@@ -107,6 +109,8 @@ To install a specific version of PHP:
 ```sh
 phpvm install 8.1
 ```
+
+**Smart Repository Detection**: On RHEL/Fedora systems, phpvm automatically detects if PHP packages are available in your current repositories. If not, it provides step-by-step instructions to enable the necessary repositories (like Remi's repository) before installation.
 
 ### Switching PHP Versions
 
@@ -196,6 +200,8 @@ export PATH="$PHPVM_DIR/bin:$PATH"
 
 If you experience issues with `phpvm`, try the following:
 
+### General Issues
+
 - Run `phpvm test` to verify all functions are working correctly
 - Check the phpvm version with `phpvm version` or `phpvm --version`
 - Ensure your shell profile is sourcing `phpvm.sh`
@@ -208,6 +214,53 @@ If you experience issues with `phpvm`, try the following:
 - On WSL systems, ensure you're using bash shell compatibility
 - If you encounter Homebrew link issues on macOS, try manually relinking: `brew unlink php@X.Y && brew link --force php@X.Y`
 - Refer to the [Changelog](./CHANGELOG.md) for recent updates and fixes
+
+### Repository Setup for RHEL/Fedora Systems
+
+If you encounter "PHP packages not found" errors on RHEL-family distributions, phpvm will automatically provide setup instructions. You can also manually enable the required repositories:
+
+#### Fedora Systems
+
+```bash
+# Install Remi's repository
+sudo dnf install https://rpms.remirepo.net/fedora/remi-release-$(rpm -E %fedora).rpm
+
+# Enable the repository
+sudo dnf config-manager --set-enabled remi
+
+# Enable specific PHP version (example for PHP 8.3)
+sudo dnf config-manager --set-enabled remi-php83
+```
+
+#### RHEL/Rocky/AlmaLinux/CentOS Systems
+
+```bash
+# Install EPEL repository
+sudo dnf install epel-release
+
+# Install Remi's repository
+sudo dnf install https://rpms.remirepo.net/enterprise/remi-release-$(rpm -E %rhel).rpm
+
+# Enable the repositories
+sudo dnf config-manager --set-enabled remi
+sudo dnf config-manager --set-enabled remi-php83  # for PHP 8.3
+```
+
+#### Alternative: Use Homebrew on Linux
+
+If you prefer to avoid repository management, you can install Homebrew on Linux:
+
+```bash
+# Install Homebrew on Linux
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# Add to your shell profile
+echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.bashrc
+source ~/.bashrc
+
+# Now phpvm will use Homebrew instead of dnf/yum
+phpvm install 8.3
+```
 
 ## Development & Testing
 
