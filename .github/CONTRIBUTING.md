@@ -98,7 +98,7 @@ We appreciate contributions to our documentation. If you’ve added a new featur
 1. **Docs Location**: Most of the documentation is located in the `README.md` or within the `docs/` folder if it exists.
 2. **Changes**: Make your changes and submit a pull request following the same process as contributing code.
 
-## 🌟 Thank You
+## Thank You
 
 Your contributions make Comet better for everyone. Thank you for taking the time to improve the project. We’re thrilled to have you as part of our community, and we’re excited to see what you’ll contribute.
 

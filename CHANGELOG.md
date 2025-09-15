@@ -1,5 +1,25 @@
 # Release Notes
 
+## [v1.6.0] - 2025-09-15
+
+### Changed
+
+- **Consolidated GitHub Actions workflows:** Streamlined CI/CD from 7 separate workflow files down to 3 focused workflows, eliminating duplication while maintaining comprehensive test coverage.
+- **Enhanced multi-distribution testing:** Expanded automated testing to cover 13 Linux distributions (Ubuntu, Debian, Fedora, Rocky Linux, AlmaLinux, Arch Linux, Alpine Linux) with 4 different package managers (apt, dnf, pacman, apk).
+- **Improved cross-platform compatibility:** Fixed package installation issues for RHEL-family distributions (Rocky/Alma Linux) and Alpine Linux in CI environments.
+- **Streamlined workflow organization:** Reorganized tests into logical categories: syntax analysis, core functionality, PHP usage, multi-distribution compatibility, performance testing, and end-to-end integration.
+
+### Fixed
+
+- **Fixed coreutils package conflicts:** Resolved dnf installation conflicts in Rocky Linux and AlmaLinux by adding `--allowerasing` flag to handle coreutils-single vs coreutils package conflicts.
+- **Fixed Alpine Linux container compatibility:** Resolved bash availability issues in Alpine Linux containers by dynamically selecting appropriate shell (sh vs bash) for initial container startup.
+- **Fixed virtual package installation:** Resolved apt installation failure for `awk` virtual package by explicitly installing `gawk` package instead.
+
+### Removed
+
+- **Removed emoji characters:** Cleaned up all emoji usage from codebase for better terminal compatibility and professional appearance.
+- **Removed redundant workflow files:** Eliminated duplicate testing workflows (use.yml, comprehensive-test.yml, performance-test.yml, integration-test.yml) by consolidating functionality into main test.yml.
+
 ## [v1.5.0](https://github.com/Thavarshan/phpvm/compare/v1.4.1...v1.5.0) - 2025-08-15
 
 ### Added

@@ -29,9 +29,9 @@ jobs:
           echo "Version output: $VERSION_OUTPUT"
 
           if echo "$VERSION_OUTPUT" | grep -q "phpvm version"; then
-            echo "✅ Version output format is correct"
+            echo "Version output format is correct"
           else
-            echo "❌ Version output format is incorrect"
+            echo "Version output format is incorrect"
             exit 1
           fi
 
@@ -44,7 +44,7 @@ jobs:
           ./phpvm.sh list
           ./phpvm.sh test
 
-          echo "✅ All core commands work"
+          echo "All core commands work"
 
       - name: Performance Check
         run: |
@@ -53,7 +53,7 @@ jobs:
           time ./phpvm.sh version >/dev/null
           time ./phpvm.sh help >/dev/null
 
-          echo "✅ Performance check completed"
+          echo "Performance check completed"
 
       - name: Documentation Check
         if: runner.os == 'Linux'
@@ -62,24 +62,24 @@ jobs:
 
           # Check that README contains key commands
           if grep -q "phpvm version" README.MD; then
-            echo "✅ README contains version command documentation"
+            echo "README contains version command documentation"
           else
-            echo "⚠️  README might be missing version command documentation"
+            echo "README might be missing version command documentation"
           fi
 
           if grep -q "phpvm install" README.MD; then
-            echo "✅ README contains install command documentation"
+            echo "README contains install command documentation"
           else
-            echo "❌ README missing install command documentation"
+            echo "README missing install command documentation"
             exit 1
           fi
 
           # Check changelog exists
           if [ -f CHANGELOG.md ]; then
-            echo "✅ Changelog file exists"
+            echo "Changelog file exists"
           else
-            echo "❌ Changelog file missing"
+            echo "Changelog file missing"
             exit 1
           fi
 
-          echo "✅ Documentation check completed"
+          echo "Documentation check completed"

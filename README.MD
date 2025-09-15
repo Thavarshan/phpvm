@@ -1,7 +1,7 @@
 [![PHP Version Manager (phpvm)](./assets/Banner.png)](https://github.com/Thavarshan/phpvm)
 
 [![Test](https://github.com/Thavarshan/phpvm/actions/workflows/test.yml/badge.svg)](https://github.com/Thavarshan/phpvm/actions/workflows/test.yml)
-[![Use](https://github.com/Thavarshan/phpvm/actions/workflows/use.yml/badge.svg)](https://github.com/Thavarshan/phpvm/actions/workflows/use.yml)
+[![Security](https://github.com/Thavarshan/phpvm/actions/workflows/security-test.yml/badge.svg)](https://github.com/Thavarshan/phpvm/actions/workflows/security-test.yml)
 [![Version](https://img.shields.io/github/v/release/Thavarshan/phpvm.svg)](https://github.com/Thavarshan/phpvm/releases)
 [![GitHub stars](https://img.shields.io/github/stars/Thavarshan/phpvm.svg)](https://github.com/Thavarshan/phpvm/stargazers)
 
@@ -237,20 +237,23 @@ The built-in test framework verifies:
 
 ### Comprehensive GitHub Actions Testing
 
-The project includes multiple specialized testing workflows:
+The project features a streamlined CI/CD pipeline with comprehensive testing workflows:
 
-#### 1. **Comprehensive Distribution Testing** (`.github/workflows/comprehensive-test.yml`)
-Tests across multiple Linux distributions and scenarios:
-- **Ubuntu**: 20.04, 22.04, 24.04
-- **Debian**: 11 (Bullseye), 12 (Bookworm)
-- **RHEL/CentOS**: Rocky Linux 8 & 9, AlmaLinux 8 & 9
-- **Fedora**: 38, 39
-- **Arch Linux**: Latest
-- **Alpine Linux**: 3.18, 3.19
-- **macOS**: Intel (13) and Apple Silicon (14, latest)
+#### 1. **Core Testing** (`.github/workflows/test.yml`)
+Comprehensive testing workflow including:
+- **Multi-Distribution Testing**: 13 Linux distributions across 4 package managers
+  - **Ubuntu**: 20.04, 22.04, 24.04
+  - **Debian**: 11 (Bullseye), 12 (Bookworm)
+  - **RHEL/CentOS**: Rocky Linux 8 & 9, AlmaLinux 8 & 9, Fedora 38 & 39
+  - **Arch Linux**: Latest
+  - **Alpine Linux**: 3.18, 3.19
+- **Cross-Platform Testing**: Ubuntu and macOS (Intel and Apple Silicon)
+- **PHP Usage Testing**: Installation, version switching, and auto-detection
+- **Performance Testing**: Startup time, concurrent operations, load testing
+- **Integration Testing**: End-to-end workflows, installation simulation, error recovery
 
 #### 2. **Security Testing** (`.github/workflows/security-test.yml`)
-Comprehensive security validation including:
+Specialized security validation including:
 - Input validation and injection prevention
 - Path traversal protection
 - Privilege escalation prevention
@@ -259,25 +262,8 @@ Comprehensive security validation including:
 - Environment variable security
 - Symlink attack prevention
 
-#### 3. **Performance Testing** (`.github/workflows/performance-test.yml`)
-Performance and load testing including:
-- Baseline performance measurements
-- Memory usage analysis
-- Concurrent operations testing
-- High-frequency operations
-- Scalability testing
-- Memory leak detection
-
-#### 4. **Integration Testing** (`.github/workflows/integration-test.yml`)
-End-to-end integration testing including:
-- Real-world scenario simulation
-- Multi-version workflows
-- Cross-platform compatibility
-- Installation simulation
-- Documentation validation
-
-#### 5. **Legacy Testing** (`.github/workflows/test.yml`)
-Original testing workflow for basic functionality validation.
+#### 3. **Release Validation** (`.github/workflows/release.yml`)
+Release testing and validation for new versions.
 
 ### Testing Coverage
 
