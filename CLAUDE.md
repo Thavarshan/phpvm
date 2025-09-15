@@ -1,4 +1,8 @@
-# CLAUDE.md - phpvm Development Guide
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## phpvm Development Guide
 
 ## Project Overview
 
@@ -61,6 +65,9 @@ The tool detects and works with multiple package managers:
 - Tests create isolated mock environments
 - All core functionality is tested including error conditions
 - Tests verify cross-platform compatibility
+- GitHub Actions runs automated tests on Ubuntu and macOS
+- Shell syntax checking with `bash -n phpvm.sh`
+- ShellCheck static analysis for code quality
 
 ### Debugging
 - Enable debug mode: `DEBUG=true phpvm <command>`
@@ -93,6 +100,14 @@ DEBUG=true ./phpvm.sh test
 # Test specific functionality manually
 DEBUG=true ./phpvm.sh install 8.1
 DEBUG=true ./phpvm.sh use 8.1
+
+# Check shell syntax
+bash -n phpvm.sh
+bash -n install.sh
+
+# Run performance checks
+time ./phpvm.sh version
+time ./phpvm.sh help
 ```
 
 ### Release Process
@@ -101,6 +116,16 @@ DEBUG=true ./phpvm.sh use 8.1
 3. Test across different platforms
 4. Ensure all tests pass
 5. Update README.md if needed
+
+## Key Functions in phpvm.sh
+
+- `main()` - Entry point with command routing (phpvm.sh:960+)
+- `detect_system()` - Package manager and OS detection (phpvm.sh:65)
+- `install_php()` - PHP version installation logic (phpvm.sh:115+)
+- `use_php_version()` - Version switching functionality (phpvm.sh:186+)
+- `find_phpvmrc()` - Auto-detection of .phpvmrc files (phpvm.sh:270+)
+- `run_tests()` - Built-in test framework (phpvm.sh:470+)
+- Helper functions: `run_with_sudo()`, `log_with_timestamp()`, output functions
 
 ## File Structure
 
@@ -114,8 +139,13 @@ phpvm/
 ├── assets/           # Project images
 ├── install-bats.sh   # BATS installation script
 ├── install.sh        # Main installation script
-├── phpvm.sh          # Core functionality
-└── versions/         # Version metadata directory
+├── phpvm.sh          # Core functionality (~1000 lines)
+├── versions/         # Version metadata directory
+└── .github/          # GitHub workflows and templates
+    └── workflows/
+        ├── test.yml  # Automated testing
+        ├── use.yml   # Usage testing
+        └── release.yml # Release automation
 ```
 
 ## Environment Variables

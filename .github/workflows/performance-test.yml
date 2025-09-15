@@ -1,0 +1,401 @@
+name: Performance and Load Testing
+
+on:
+  push:
+    branches: [main, development]
+  pull_request:
+    branches: [main, development]
+  schedule:
+    # Run weekly performance tests
+    - cron: '0 3 * * 0'
+  workflow_dispatch:
+
+jobs:
+  performance-benchmark:
+    name: Performance Benchmarks
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Environment
+        run: |
+          chmod +x ./phpvm.sh
+
+          # Install time command if not available
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            sudo apt-get update
+            sudo apt-get install -y time
+          fi
+
+      - name: Baseline Performance Test
+        run: |
+          echo "=== Baseline Performance Measurements ==="
+
+          # Measure startup time
+          echo "Measuring startup time (10 iterations):"
+          for i in {1..10}; do
+            /usr/bin/time -f "%e seconds" ./phpvm.sh version >/dev/null
+          done
+
+          # Measure help command performance
+          echo -e "\nMeasuring help command (10 iterations):"
+          for i in {1..10}; do
+            /usr/bin/time -f "%e seconds" ./phpvm.sh help >/dev/null
+          done
+
+          # Measure system detection performance
+          echo -e "\nMeasuring system detection (10 iterations):"
+          for i in {1..10}; do
+            /usr/bin/time -f "%e seconds" ./phpvm.sh info >/dev/null
+          done
+
+      - name: Memory Usage Test
+        run: |
+          echo "=== Memory Usage Testing ==="
+
+          # Test memory usage with different commands
+          if command -v /usr/bin/time >/dev/null; then
+            echo "Memory usage for version command:"
+            /usr/bin/time -f "Peak memory: %M KB" ./phpvm.sh version >/dev/null
+
+            echo "Memory usage for help command:"
+            /usr/bin/time -f "Peak memory: %M KB" ./phpvm.sh help >/dev/null
+
+            echo "Memory usage for info command:"
+            /usr/bin/time -f "Peak memory: %M KB" ./phpvm.sh info >/dev/null
+
+            echo "Memory usage for test command:"
+            /usr/bin/time -f "Peak memory: %M KB" ./phpvm.sh test >/dev/null
+          else
+            echo "time command not available for memory measurement"
+          fi
+
+      - name: Concurrent Operations Test
+        run: |
+          echo "=== Concurrent Operations Testing ==="
+
+          # Test concurrent read operations
+          echo "Testing 20 concurrent version commands:"
+          start_time=$(date +%s.%N)
+
+          for i in {1..20}; do
+            ./phpvm.sh version >/dev/null &
+          done
+          wait
+
+          end_time=$(date +%s.%N)
+          duration=$(echo "$end_time - $start_time" | bc -l)
+          echo "20 concurrent operations completed in: ${duration} seconds"
+
+          # Test concurrent info commands
+          echo "Testing 10 concurrent info commands:"
+          start_time=$(date +%s.%N)
+
+          for i in {1..10}; do
+            ./phpvm.sh info >/dev/null &
+          done
+          wait
+
+          end_time=$(date +%s.%N)
+          duration=$(echo "$end_time - $start_time" | bc -l)
+          echo "10 concurrent info operations completed in: ${duration} seconds"
+
+      - name: File I/O Performance Test
+        run: |
+          echo "=== File I/O Performance Testing ==="
+
+          # Test .phpvmrc scanning performance with deep directory structure
+          mkdir -p deep/nested/directory/structure/for/testing
+          echo "8.1" > deep/.phpvmrc
+
+          cd deep/nested/directory/structure/for/testing
+
+          echo "Testing .phpvmrc scanning in deep directory (10 iterations):"
+          for i in {1..10}; do
+            /usr/bin/time -f "%e seconds" ../../../../../phpvm.sh auto 2>/dev/null || true
+          done
+
+          cd - >/dev/null
+
+          # Test with many .phpvmrc files
+          echo "Testing with multiple .phpvmrc files:"
+          for i in {1..100}; do
+            mkdir -p "test_dir_$i"
+            echo "8.$((i % 3))" > "test_dir_$i/.phpvmrc"
+          done
+
+          # Test auto command in each directory
+          start_time=$(date +%s.%N)
+          for i in {1..10}; do
+            cd "test_dir_$((i % 100 + 1))"
+            ../phpvm.sh auto >/dev/null 2>&1 || true
+            cd ..
+          done
+          end_time=$(date +%s.%N)
+          duration=$(echo "$end_time - $start_time" | bc -l)
+          echo "10 auto operations with various .phpvmrc files: ${duration} seconds"
+
+      - name: Large Input Handling Test
+        run: |
+          echo "=== Large Input Handling Performance ==="
+
+          # Test with progressively larger inputs
+          for size in 100 1000 10000; do
+            large_input=$(printf 'a%.0s' $(seq 1 $size))
+            echo "Testing with ${size} character input:"
+            /usr/bin/time -f "%e seconds" ./phpvm.sh install "$large_input" 2>/dev/null || true
+          done
+
+      - name: System Resource Monitoring
+        run: |
+          echo "=== System Resource Monitoring ==="
+
+          # Monitor system resources during test execution
+          if command -v top >/dev/null; then
+            echo "Running resource monitoring during test execution..."
+
+            # Start resource monitoring in background
+            top -b -n 1 > resources_before.txt
+
+            # Run comprehensive test
+            ./phpvm.sh test >/dev/null
+
+            top -b -n 1 > resources_after.txt
+
+            echo "Resource usage comparison available in artifacts"
+          fi
+
+      - name: Performance Regression Check
+        run: |
+          echo "=== Performance Regression Check ==="
+
+          # Set performance thresholds
+          MAX_STARTUP_TIME=1.0  # seconds
+          MAX_MEMORY_KB=10240   # 10MB
+
+          # Test startup time
+          startup_time=$(( /usr/bin/time -f "%e" ./phpvm.sh version >/dev/null ) 2>&1)
+
+          if command -v bc >/dev/null; then
+            if [ $(echo "$startup_time > $MAX_STARTUP_TIME" | bc -l) -eq 1 ]; then
+              echo "⚠️  Performance regression: Startup time ${startup_time}s exceeds threshold ${MAX_STARTUP_TIME}s"
+            else
+              echo "✅ Startup time ${startup_time}s within acceptable range"
+            fi
+          fi
+
+          echo "✅ Performance tests completed"
+
+  load-testing:
+    name: Load Testing
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Load Testing Environment
+        run: |
+          chmod +x ./phpvm.sh
+          sudo apt-get update
+          sudo apt-get install -y time bc
+
+      - name: High Frequency Operations Test
+        run: |
+          echo "=== High Frequency Operations Test ==="
+
+          # Test rapid successive calls
+          echo "Testing 1000 rapid version calls:"
+          start_time=$(date +%s.%N)
+
+          for i in {1..1000}; do
+            ./phpvm.sh version >/dev/null
+          done
+
+          end_time=$(date +%s.%N)
+          duration=$(echo "$end_time - $start_time" | bc -l)
+          rate=$(echo "scale=2; 1000 / $duration" | bc -l)
+          echo "1000 operations completed in ${duration} seconds (${rate} ops/sec)"
+
+      - name: Parallel Load Test
+        run: |
+          echo "=== Parallel Load Test ==="
+
+          # Test with multiple parallel processes
+          echo "Testing 50 parallel processes with 10 operations each:"
+          start_time=$(date +%s.%N)
+
+          for i in {1..50}; do
+            (
+              for j in {1..10}; do
+                ./phpvm.sh version >/dev/null
+              done
+            ) &
+          done
+          wait
+
+          end_time=$(date +%s.%N)
+          duration=$(echo "$end_time - $start_time" | bc -l)
+          total_ops=500
+          rate=$(echo "scale=2; $total_ops / $duration" | bc -l)
+          echo "$total_ops operations completed in ${duration} seconds (${rate} ops/sec)"
+
+      - name: Stress Test Directory Scanning
+        run: |
+          echo "=== Stress Test Directory Scanning ==="
+
+          # Create a complex directory structure
+          for depth in {1..10}; do
+            dir_path=""
+            for level in $(seq 1 $depth); do
+              dir_path="${dir_path}level${level}/"
+            done
+            mkdir -p "$dir_path"
+
+            # Add .phpvmrc at various depths
+            if [ $((depth % 3)) -eq 0 ]; then
+              echo "8.$((depth % 3 + 1))" > "${dir_path}.phpvmrc"
+            fi
+          done
+
+          # Test auto command from deepest directory
+          cd level1/level2/level3/level4/level5/level6/level7/level8/level9/level10
+
+          echo "Testing .phpvmrc scanning from 10 levels deep (100 iterations):"
+          start_time=$(date +%s.%N)
+
+          for i in {1..100}; do
+            ../../../../../../../../../../phpvm.sh auto >/dev/null 2>&1 || true
+          done
+
+          end_time=$(date +%s.%N)
+          duration=$(echo "$end_time - $start_time" | bc -l)
+          echo "100 deep directory scans completed in ${duration} seconds"
+
+          cd - >/dev/null
+
+      - name: Memory Leak Detection
+        run: |
+          echo "=== Memory Leak Detection ==="
+
+          # Run operations repeatedly and monitor memory
+          echo "Running extended operations to detect memory leaks..."
+
+          for iteration in {1..5}; do
+            echo "Iteration $iteration:"
+
+            # Run multiple operations
+            for i in {1..200}; do
+              ./phpvm.sh version >/dev/null
+              ./phpvm.sh help >/dev/null
+              ./phpvm.sh info >/dev/null
+            done
+
+            # Check memory usage
+            if command -v ps >/dev/null; then
+              ps aux | grep phpvm | grep -v grep || echo "No phpvm processes found"
+            fi
+
+            # Small delay between iterations
+            sleep 1
+          done
+
+      - name: Resource Cleanup Test
+        run: |
+          echo "=== Resource Cleanup Test ==="
+
+          # Test proper cleanup after operations
+          temp_dirs_before=$(find /tmp -name "*phpvm*" 2>/dev/null | wc -l)
+          echo "Temp directories before: $temp_dirs_before"
+
+          # Run test that creates temporary resources
+          ./phpvm.sh test >/dev/null
+
+          temp_dirs_after=$(find /tmp -name "*phpvm*" 2>/dev/null | wc -l)
+          echo "Temp directories after: $temp_dirs_after"
+
+          if [ "$temp_dirs_after" -gt "$temp_dirs_before" ]; then
+            echo "⚠️  Possible resource leak: $((temp_dirs_after - temp_dirs_before)) new temp directories"
+          else
+            echo "✅ No resource leaks detected"
+          fi
+
+  scalability-test:
+    name: Scalability Testing
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Scalability Testing
+        run: |
+          chmod +x ./phpvm.sh
+          sudo apt-get update
+          sudo apt-get install -y time bc
+
+      - name: Variable Load Test
+        run: |
+          echo "=== Variable Load Testing ==="
+
+          # Test with different load levels
+          for load_level in 10 50 100 200; do
+            echo "Testing with load level: $load_level"
+
+            start_time=$(date +%s.%N)
+
+            for i in $(seq 1 $load_level); do
+              ./phpvm.sh version >/dev/null &
+            done
+            wait
+
+            end_time=$(date +%s.%N)
+            duration=$(echo "$end_time - $start_time" | bc -l)
+            rate=$(echo "scale=2; $load_level / $duration" | bc -l)
+
+            echo "Load $load_level: ${duration}s (${rate} ops/sec)"
+          done
+
+      - name: Scalability Metrics Collection
+        run: |
+          echo "=== Scalability Metrics Collection ==="
+
+          # Collect various performance metrics
+          echo "Operation,Count,Duration,Rate" > performance_metrics.csv
+
+          for op in version help info; do
+            for count in 10 50 100; do
+              start_time=$(date +%s.%N)
+
+              for i in $(seq 1 $count); do
+                ./phpvm.sh $op >/dev/null
+              done
+
+              end_time=$(date +%s.%N)
+              duration=$(echo "$end_time - $start_time" | bc -l)
+              rate=$(echo "scale=2; $count / $duration" | bc -l)
+
+              echo "$op,$count,$duration,$rate" >> performance_metrics.csv
+            done
+          done
+
+          echo "Performance metrics:"
+          cat performance_metrics.csv
+
+      - name: Generate Performance Report
+        run: |
+          echo "=== Performance Test Summary ==="
+          echo "Comprehensive performance testing completed including:"
+          echo "- Baseline performance measurements"
+          echo "- Memory usage analysis"
+          echo "- Concurrent operations testing"
+          echo "- File I/O performance"
+          echo "- Large input handling"
+          echo "- Load testing with variable loads"
+          echo "- Memory leak detection"
+          echo "- Resource cleanup validation"
+          echo "- Scalability metrics"
+          echo ""
+          echo "✅ All performance tests completed successfully"

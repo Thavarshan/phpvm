@@ -25,6 +25,11 @@ PHPVM_ACTIVE_VERSION_FILE="$PHPVM_DIR/active_version"
 PHPVM_CURRENT_SYMLINK="$PHPVM_DIR/current"
 DEBUG=false # Set to true to enable debug logs
 
+# Cache for command availability checks
+PHPVM_CACHE_PHP_CONFIG=""
+PHPVM_CACHE_PHP=""
+PHPVM_CACHE_UPDATE_ALTERNATIVES=""
+
 # Helper function to run commands with sudo if needed
 run_with_sudo() {
     if [ "$(id -u)" -ne 0 ]; then
@@ -61,47 +66,202 @@ create_directories() {
     }
 }
 
+# Get OS information
+get_os_info() {
+    OS_TYPE="$(uname -s)"
+    OS_ARCH="$(uname -m)"
+
+    # Detect macOS version
+    if [ "$OS_TYPE" = "Darwin" ]; then
+        if command -v sw_vers >/dev/null 2>&1; then
+            MACOS_VERSION="$(sw_vers -productVersion)"
+            MACOS_MAJOR="$(echo "$MACOS_VERSION" | cut -d. -f1)"
+            MACOS_MINOR="$(echo "$MACOS_VERSION" | cut -d. -f2)"
+        fi
+    fi
+
+    # Detect Linux distribution and WSL
+    if [ "$OS_TYPE" = "Linux" ]; then
+        # Check for WSL (Windows Subsystem for Linux)
+        if [ -f "/proc/version" ] && grep -qi "microsoft\|WSL" /proc/version 2>/dev/null; then
+            IS_WSL=true
+            if grep -qi "wsl2" /proc/version 2>/dev/null; then
+                WSL_VERSION="2"
+            else
+                WSL_VERSION="1"
+            fi
+            phpvm_debug "Detected WSL $WSL_VERSION environment"
+        else
+            IS_WSL=false
+        fi
+
+        # Try modern method first
+        if [ -f "/etc/os-release" ]; then
+            # shellcheck disable=SC1091
+            . /etc/os-release
+            LINUX_DISTRO="$ID"
+            LINUX_VERSION="$VERSION_ID"
+        elif [ -f "/etc/lsb-release" ]; then
+            # shellcheck disable=SC1091
+            . /etc/lsb-release
+            LINUX_DISTRO="$(echo "$DISTRIB_ID" | tr '[:upper:]' '[:lower:]')"
+            LINUX_VERSION="$DISTRIB_RELEASE"
+        elif [ -f "/etc/redhat-release" ]; then
+            LINUX_DISTRO="rhel"
+            LINUX_VERSION="$(grep -o '[0-9]' /etc/redhat-release | head -1)"
+        elif [ -f "/etc/debian_version" ]; then
+            LINUX_DISTRO="debian"
+            LINUX_VERSION="$(cat /etc/debian_version)"
+        fi
+
+        # WSL-specific adjustments
+        if [ "$IS_WSL" = "true" ]; then
+            phpvm_debug "WSL detected - applying WSL-specific configurations"
+            # WSL may have different PATH requirements
+            if [ "$WSL_VERSION" = "1" ]; then
+                phpvm_warn "WSL 1 detected. Some features may not work as expected."
+            fi
+        fi
+    fi
+}
+
 # Detect the system's package manager and OS
 detect_system() {
-    if [ "$(uname)" = "Darwin" ]; then
+    # Get detailed OS information
+    get_os_info
+
+    if [ "$OS_TYPE" = "Darwin" ]; then
         PKG_MANAGER="brew"
         if ! command -v brew >/dev/null 2>&1; then
             phpvm_err "Homebrew is not installed. Please install Homebrew first."
+            phpvm_warn "Visit https://brew.sh to install Homebrew."
             return 1
         fi
-        HOMEBREW_PREFIX=$(brew --prefix)
+
+        # Handle different macOS versions and architectures
+        if command -v brew >/dev/null 2>&1; then
+            HOMEBREW_PREFIX=$(brew --config 2>/dev/null | grep "HOMEBREW_PREFIX" | cut -d: -f2 | tr -d ' ' || brew --prefix)
+        fi
+
+        # Fallback for different macOS versions
+        if [ -z "$HOMEBREW_PREFIX" ]; then
+            if [ "$OS_ARCH" = "arm64" ] && [ -d "/opt/homebrew" ]; then
+                HOMEBREW_PREFIX="/opt/homebrew"
+            elif [ -d "/usr/local" ]; then
+                HOMEBREW_PREFIX="/usr/local"
+            fi
+        fi
+
         PHP_BIN_PATH="$HOMEBREW_PREFIX/bin"
+        phpvm_debug "Detected macOS $MACOS_VERSION on $OS_ARCH, Homebrew prefix: $HOMEBREW_PREFIX"
         return 0
     fi
 
-    # Detect Linux package manager
-    if command -v apt-get >/dev/null 2>&1; then
-        PKG_MANAGER="apt"
-        PHP_BIN_PATH="/usr/bin"
-    elif command -v dnf >/dev/null 2>&1; then
-        PKG_MANAGER="dnf"
-        PHP_BIN_PATH="/usr/bin"
-    elif command -v yum >/dev/null 2>&1; then
-        PKG_MANAGER="yum"
-        PHP_BIN_PATH="/usr/bin"
-    elif command -v pacman >/dev/null 2>&1; then
-        PKG_MANAGER="pacman"
-        PHP_BIN_PATH="/usr/bin"
-    elif command -v brew >/dev/null 2>&1; then
-        PKG_MANAGER="brew"
-        # Detect Linuxbrew path
-        if [ -d "/home/linuxbrew/.linuxbrew" ]; then
-            HOMEBREW_PREFIX="/home/linuxbrew/.linuxbrew"
-        elif [ -d "$HOME/.linuxbrew" ]; then
-            HOMEBREW_PREFIX="$HOME/.linuxbrew"
+    # Enhanced Linux package manager detection with distribution-specific logic
+    if [ "$OS_TYPE" = "Linux" ]; then
+        phpvm_debug "Detected Linux distribution: $LINUX_DISTRO $LINUX_VERSION"
+
+        # Debian/Ubuntu family
+        if command -v apt-get >/dev/null 2>&1; then
+            PKG_MANAGER="apt"
+            PHP_BIN_PATH="/usr/bin"
+
+            # Check for specific Ubuntu/Debian PHP package patterns
+            if [ "$LINUX_DISTRO" = "ubuntu" ] || [ "$LINUX_DISTRO" = "debian" ]; then
+                # Modern Ubuntu/Debian uses php-fpm patterns
+                if [ "$LINUX_DISTRO" = "ubuntu" ] && [ -n "$LINUX_VERSION" ]; then
+                    # Ubuntu 20.04+ has different PHP packaging
+                    case "$LINUX_VERSION" in
+                        20.*|22.*|24.*)
+                            PHP_PACKAGE_PATTERN="php"
+                            ;;
+                        *)
+                            PHP_PACKAGE_PATTERN="php"
+                            ;;
+                    esac
+                fi
+            fi
+
+        # RHEL/Fedora/CentOS family
+        elif command -v dnf >/dev/null 2>&1; then
+            PKG_MANAGER="dnf"
+            PHP_BIN_PATH="/usr/bin"
+
+            # Fedora-specific adjustments
+            if [ "$LINUX_DISTRO" = "fedora" ]; then
+                # Fedora uses different PHP version patterns
+                PHP_PACKAGE_PATTERN="php"
+            fi
+
+        elif command -v yum >/dev/null 2>&1; then
+            PKG_MANAGER="yum"
+            PHP_BIN_PATH="/usr/bin"
+
+            # RHEL/CentOS specific adjustments
+            if [ "$LINUX_DISTRO" = "rhel" ] || [ "$LINUX_DISTRO" = "centos" ]; then
+                # May need EPEL repository for modern PHP versions
+                if [ -n "$LINUX_VERSION" ] && [ "$LINUX_VERSION" -lt 8 ]; then
+                    phpvm_warn "RHEL/CentOS $LINUX_VERSION may require EPEL repository for modern PHP versions"
+                fi
+            fi
+
+        # Arch Linux family
+        elif command -v pacman >/dev/null 2>&1; then
+            PKG_MANAGER="pacman"
+            PHP_BIN_PATH="/usr/bin"
+
+            # Arch Linux specific adjustments
+            if [ "$LINUX_DISTRO" = "arch" ] || [ "$LINUX_DISTRO" = "manjaro" ]; then
+                # Arch uses different versioning scheme
+                PHP_PACKAGE_PATTERN="php"
+            fi
+
+        # Linuxbrew as fallback
+        elif command -v brew >/dev/null 2>&1; then
+            PKG_MANAGER="brew"
+
+            # Enhanced Linuxbrew detection
+            if [ -n "$HOMEBREW_PREFIX" ]; then
+                # Use existing prefix
+                :
+            elif [ -d "/home/linuxbrew/.linuxbrew" ]; then
+                HOMEBREW_PREFIX="/home/linuxbrew/.linuxbrew"
+            elif [ -d "$HOME/.linuxbrew" ]; then
+                HOMEBREW_PREFIX="$HOME/.linuxbrew"
+            elif command -v brew >/dev/null 2>&1; then
+                HOMEBREW_PREFIX=$(brew --prefix 2>/dev/null || echo "/usr/local")
+            else
+                HOMEBREW_PREFIX="/usr/local"
+            fi
+
+            PHP_BIN_PATH="$HOMEBREW_PREFIX/bin"
+            phpvm_debug "Using Linuxbrew at $HOMEBREW_PREFIX"
+
         else
-            HOMEBREW_PREFIX=$(brew --prefix)
+            phpvm_err "No supported package manager found (apt, dnf, yum, pacman, or brew)."
+            phpvm_warn "Detected: $LINUX_DISTRO $LINUX_VERSION"
+            phpvm_warn "Consider installing one of the supported package managers or Linuxbrew."
+            return 1
         fi
-        PHP_BIN_PATH="$HOMEBREW_PREFIX/bin"
     else
-        phpvm_err "No supported package manager found (apt, dnf, yum, pacman, or brew)."
+        phpvm_err "Unsupported operating system: $OS_TYPE"
         return 1
     fi
+}
+
+# Validate PHP version format
+validate_php_version() {
+    local version="$1"
+
+    # Allow 'system' as a special case
+    [ "$version" = "system" ] && return 0
+
+    # Check for basic PHP version format (X.Y or X.Y.Z)
+    if echo "$version" | grep -qE '^[0-9]+\.[0-9]+(\.[0-9]+)?$'; then
+        return 0
+    fi
+
+    return 1
 }
 
 # Install PHP using the detected package manager
@@ -111,6 +271,12 @@ install_php() {
         phpvm_err "No PHP version specified for installation."
         return 1
     }
+
+    # Validate version format
+    if ! validate_php_version "$version"; then
+        phpvm_err "Invalid PHP version format: $version. Expected format: X.Y or X.Y.Z"
+        return 1
+    fi
 
     phpvm_echo "Installing PHP $version..."
 
@@ -132,27 +298,125 @@ install_php() {
         fi
         ;;
     apt)
-        run_with_sudo apt-get update
-        if ! run_with_sudo apt-get install -y php"$version"; then
-            phpvm_err "Failed to install PHP $version. Package php$version may not exist."
-            return 1
+        # Update package list
+        run_with_sudo apt-get update || {
+            phpvm_warn "Failed to update package list, continuing anyway..."
+        }
+
+        # Handle different Ubuntu/Debian PHP installation patterns
+        if [ "$LINUX_DISTRO" = "ubuntu" ]; then
+            case "$LINUX_VERSION" in
+                20.*|22.*|24.*)
+                    # Modern Ubuntu: Try php-fpm and php-cli packages
+                    if ! run_with_sudo apt-get install -y php"$version"-fpm php"$version"-cli; then
+                        # Fallback to basic php package
+                        if ! run_with_sudo apt-get install -y php"$version"; then
+                            phpvm_err "Failed to install PHP $version. You may need to add ondrej/php PPA:"
+                            phpvm_err "sudo add-apt-repository ppa:ondrej/php && sudo apt-get update"
+                            return 1
+                        fi
+                    fi
+                    ;;
+                18.*|16.*)
+                    # Older Ubuntu versions
+                    if ! run_with_sudo apt-get install -y php"$version"; then
+                        phpvm_err "Failed to install PHP $version. Package php$version may not exist."
+                        phpvm_warn "Consider upgrading Ubuntu or adding ondrej/php PPA"
+                        return 1
+                    fi
+                    ;;
+                *)
+                    # Default fallback
+                    if ! run_with_sudo apt-get install -y php"$version"; then
+                        phpvm_err "Failed to install PHP $version. Package php$version may not exist."
+                        return 1
+                    fi
+                    ;;
+            esac
+        elif [ "$LINUX_DISTRO" = "debian" ]; then
+            # Debian-specific installation
+            if ! run_with_sudo apt-get install -y php"$version"-fpm php"$version"-cli; then
+                if ! run_with_sudo apt-get install -y php"$version"; then
+                    phpvm_err "Failed to install PHP $version. You may need to add sury.org repository:"
+                    phpvm_err "curl -sSL https://packages.sury.org/php/README.txt | sudo bash -x"
+                    return 1
+                fi
+            fi
+        else
+            # Generic apt-based system
+            if ! run_with_sudo apt-get install -y php"$version"; then
+                phpvm_err "Failed to install PHP $version. Package php$version may not exist."
+                return 1
+            fi
         fi
+
         # Post-install check for binary
         if ! [ -x "/usr/bin/php$version" ]; then
             phpvm_warn "php$version installed, but /usr/bin/php$version not found. You may need to install php$version-cli or check your PATH."
         fi
         ;;
-    dnf | yum)
-        run_with_sudo $PKG_MANAGER install -y php"$version" || {
+    dnf)
+        # Fedora/RHEL 8+ with dnf
+        if [ "$LINUX_DISTRO" = "fedora" ]; then
+            # Fedora uses different PHP packages
+            if ! run_with_sudo dnf install -y php"$version" php"$version"-cli; then
+                phpvm_err "Failed to install PHP $version. Package php$version may not exist."
+                phpvm_warn "Check available versions with: dnf search php"
+                return 1
+            fi
+        else
+            # RHEL/CentOS with dnf
+            if ! run_with_sudo dnf install -y php"$version"; then
+                phpvm_err "Failed to install PHP $version. Package php$version may not exist."
+                phpvm_warn "You may need to enable EPEL or Remi repository"
+                return 1
+            fi
+        fi
+        ;;
+    yum)
+        # RHEL/CentOS 7 and older
+        if [ "$LINUX_DISTRO" = "rhel" ] || [ "$LINUX_DISTRO" = "centos" ]; then
+            if [ -n "$LINUX_VERSION" ] && [ "$LINUX_VERSION" -lt 8 ]; then
+                phpvm_warn "Installing PHP $version on RHEL/CentOS $LINUX_VERSION"
+                phpvm_warn "You may need EPEL and Remi repositories for modern PHP versions"
+            fi
+        fi
+
+        if ! run_with_sudo yum install -y php"$version"; then
             phpvm_err "Failed to install PHP $version. Package php$version may not exist."
+            phpvm_warn "Consider enabling EPEL: sudo yum install epel-release"
+            phpvm_warn "Consider enabling Remi: sudo yum install https://rpms.remirepo.net/enterprise/remi-release-7.rpm"
             return 1
-        }
+        fi
         ;;
     pacman)
-        run_with_sudo pacman -Sy
-        if ! run_with_sudo pacman -S --noconfirm php"$version"; then
-            phpvm_err "Failed to install PHP $version. Package php$version may not exist."
-            return 1
+        # Arch Linux
+        run_with_sudo pacman -Sy || {
+            phpvm_warn "Failed to sync package databases, continuing anyway..."
+        }
+
+        if [ "$LINUX_DISTRO" = "arch" ] || [ "$LINUX_DISTRO" = "manjaro" ]; then
+            # Arch Linux typically has 'php' package for current version
+            if [ "$version" = "8.2" ] || [ "$version" = "8.3" ]; then
+                # Current PHP version in repos
+                if ! run_with_sudo pacman -S --noconfirm php; then
+                    phpvm_err "Failed to install PHP. Check available versions with: pacman -Ss php"
+                    return 1
+                fi
+            else
+                # Older versions may not be available
+                phpvm_warn "PHP $version may not be available in Arch repos. Trying anyway..."
+                if ! run_with_sudo pacman -S --noconfirm php"$version"; then
+                    phpvm_err "Failed to install PHP $version. Consider using AUR or different version."
+                    return 1
+                fi
+            fi
+        else
+            # Generic pacman system
+            if ! run_with_sudo pacman -S --noconfirm php"$version"; then
+                phpvm_err "Failed to install PHP $version. Package php$version may not exist."
+                return 1
+            fi
         fi
         ;;
     esac
@@ -171,13 +435,42 @@ get_installed_php_version() {
         return 0
     fi
 
-    if command -v php-config >/dev/null 2>&1; then
-        php-config --version
-    elif command -v php >/dev/null 2>&1; then
-        php -v | awk '/^PHP/ {print $2}'
-    else
-        echo "N/A"
+    local version_output
+
+    # Use cached command availability or check and cache
+    if [ -z "$PHPVM_CACHE_PHP_CONFIG" ]; then
+        if command -v php-config >/dev/null 2>&1; then
+            PHPVM_CACHE_PHP_CONFIG="available"
+        else
+            PHPVM_CACHE_PHP_CONFIG="unavailable"
+        fi
     fi
+
+    if [ "$PHPVM_CACHE_PHP_CONFIG" = "available" ]; then
+        if version_output=$(php-config --version 2>/dev/null); then
+            echo "$version_output"
+            return 0
+        fi
+    fi
+
+    # Use cached command availability or check and cache
+    if [ -z "$PHPVM_CACHE_PHP" ]; then
+        if command -v php >/dev/null 2>&1; then
+            PHPVM_CACHE_PHP="available"
+        else
+            PHPVM_CACHE_PHP="unavailable"
+        fi
+    fi
+
+    if [ "$PHPVM_CACHE_PHP" = "available" ]; then
+        if version_output=$(php -v 2>/dev/null); then
+            echo "$version_output" | awk '/^PHP/ {print $2}' | head -n1
+            return 0
+        fi
+    fi
+
+    echo "N/A"
+    return 1
 }
 
 # Switch to a specific PHP version
@@ -187,6 +480,12 @@ use_php_version() {
         phpvm_err "No PHP version specified to switch."
         return 1
     }
+
+    # Validate version format
+    if ! validate_php_version "$version"; then
+        phpvm_err "Invalid PHP version format: $version. Expected format: X.Y, X.Y.Z, or 'system'"
+        return 1
+    fi
 
     phpvm_echo "Switching to PHP $version..."
 
@@ -213,9 +512,12 @@ use_php_version() {
         phpvm_debug "Unlinking any existing PHP version..."
         brew unlink php >/dev/null 2>&1 || true
         # Unlink all versioned PHP installations
-        for php_formula in $(brew list --formula | grep -E '^php@[0-9]+\.[0-9]+$'); do
-            brew unlink "$php_formula" >/dev/null 2>&1 || true
-        done
+        # Use a safer approach to handle potential failures in command substitution
+        if formula_list=$(brew list --formula 2>/dev/null); then
+            echo "$formula_list" | grep -E '^php@[0-9]+\.[0-9]+$' | while read -r php_formula; do
+                [ -n "$php_formula" ] && brew unlink "$php_formula" >/dev/null 2>&1 || true
+            done
+        fi
 
         if [ "$version" = "system" ]; then
             # Special case for switching to system PHP
@@ -223,24 +525,49 @@ use_php_version() {
             # Remove the current symlink since we're using system PHP
             rm -f "$PHPVM_CURRENT_SYMLINK"
 
-            # On macOS, "system" PHP typically means the main Homebrew php formula
-            # since Apple removed PHP from macOS starting with macOS Monterey 12.0
-            if [ -d "$HOMEBREW_PREFIX/Cellar/php" ]; then
-                phpvm_debug "Linking Homebrew php formula as system default..."
-                brew link php --force --overwrite >/dev/null 2>&1 || {
-                    phpvm_err "Failed to link Homebrew php formula."
-                    return 1
-                }
-                phpvm_echo "Switched to system PHP (Homebrew default)."
-                return 0
-            # Fallback: check for any system PHP in standard locations (rare on modern macOS)
-            elif command -v php >/dev/null 2>&1; then
-                phpvm_echo "Switched to system PHP."
-                return 0
+            # Handle different macOS versions
+            # Apple removed PHP from macOS starting with macOS Monterey 12.0
+            if [ -n "$MACOS_MAJOR" ] && [ "$MACOS_MAJOR" -ge 12 ]; then
+                # macOS 12+ doesn't have built-in PHP, use Homebrew
+                if [ -d "$HOMEBREW_PREFIX/Cellar/php" ]; then
+                    phpvm_debug "Linking Homebrew php formula as system default (macOS $MACOS_VERSION)..."
+                    brew link php --force --overwrite >/dev/null 2>&1 || {
+                        phpvm_err "Failed to link Homebrew php formula."
+                        return 1
+                    }
+                    phpvm_echo "Switched to system PHP (Homebrew default)."
+                    return 0
+                else
+                    phpvm_warn "No system PHP available on macOS $MACOS_VERSION. Installing Homebrew PHP..."
+                    if brew install php >/dev/null 2>&1; then
+                        phpvm_echo "Installed and switched to system PHP (Homebrew)."
+                        return 0
+                    else
+                        phpvm_err "Failed to install system PHP via Homebrew."
+                        return 1
+                    fi
+                fi
             else
-                phpvm_echo "Switched to system PHP."
-                phpvm_warn "No system PHP found. You may need to install PHP with 'brew install php' or switch to a specific version."
-                return 0
+                # macOS 11 and earlier may have built-in PHP
+                if [ -x "/usr/bin/php" ]; then
+                    phpvm_echo "Switched to system PHP (built-in macOS PHP)."
+                    return 0
+                elif [ -d "$HOMEBREW_PREFIX/Cellar/php" ]; then
+                    phpvm_debug "Linking Homebrew php formula as system default..."
+                    brew link php --force --overwrite >/dev/null 2>&1 || {
+                        phpvm_err "Failed to link Homebrew php formula."
+                        return 1
+                    }
+                    phpvm_echo "Switched to system PHP (Homebrew default)."
+                    return 0
+                elif command -v php >/dev/null 2>&1; then
+                    phpvm_echo "Switched to system PHP."
+                    return 0
+                else
+                    phpvm_echo "Switched to system PHP."
+                    phpvm_warn "No system PHP found. You may need to install PHP with 'brew install php' or switch to a specific version."
+                    return 0
+                fi
             fi
         fi
 
@@ -270,30 +597,104 @@ use_php_version() {
         fi
         ;;
     apt | dnf | yum | pacman)
-        # For Linux package managers, we use update-alternatives if available
-        if command -v update-alternatives >/dev/null 2>&1; then
-            if [ "$version" = "system" ]; then
-                # Use auto option for system default
+        # Linux-specific PHP switching logic
+        if [ "$version" = "system" ]; then
+            # Handle system PHP differently per distribution
+            if command -v update-alternatives >/dev/null 2>&1; then
+                # Use update-alternatives if available
                 run_with_sudo update-alternatives --auto php || {
                     phpvm_err "Failed to switch to system PHP version."
                     return 1
                 }
-                echo "system" >"$PHPVM_ACTIVE_VERSION_FILE"
-                phpvm_echo "Switched to system PHP."
-                return 0
+            elif [ "$LINUX_DISTRO" = "arch" ] || [ "$LINUX_DISTRO" = "manjaro" ]; then
+                # Arch Linux: system PHP is typically the main 'php' package
+                if [ -x "/usr/bin/php" ]; then
+                    phpvm_debug "Using system PHP on Arch Linux"
+                else
+                    phpvm_warn "No system PHP found. Install with: sudo pacman -S php"
+                fi
+            fi
+            echo "system" >"$PHPVM_ACTIVE_VERSION_FILE"
+            phpvm_echo "Switched to system PHP."
+            return 0
+        fi
+
+        # Version-specific switching
+        if command -v update-alternatives >/dev/null 2>&1; then
+            # Debian/Ubuntu style with update-alternatives
+            php_binary="/usr/bin/php$version"
+
+            # Handle different binary naming patterns
+            if [ ! -f "$php_binary" ]; then
+                # Try alternative patterns
+                if [ -f "/usr/bin/php-$version" ]; then
+                    php_binary="/usr/bin/php-$version"
+                elif [ -f "/usr/bin/php${version/./}" ]; then
+                    php_binary="/usr/bin/php${version/./}"
+                fi
             fi
 
-            if [ -f "/usr/bin/php$version" ]; then
-                run_with_sudo update-alternatives --set php "/usr/bin/php$version" || {
+            if [ -f "$php_binary" ]; then
+                # Install alternative if not already present
+                if ! update-alternatives --list php 2>/dev/null | grep -q "$php_binary"; then
+                    phpvm_debug "Installing alternative for PHP $version"
+                    run_with_sudo update-alternatives --install /usr/bin/php php "$php_binary" 10 || {
+                        phpvm_warn "Failed to install alternative, trying direct switch..."
+                    }
+                fi
+
+                run_with_sudo update-alternatives --set php "$php_binary" || {
                     phpvm_err "Failed to switch to PHP $version using update-alternatives."
                     return 1
                 }
             else
-                phpvm_err "PHP binary for version $version not found at /usr/bin/php$version"
+                phpvm_err "PHP binary for version $version not found. Tried: $php_binary"
                 return 1
             fi
+
+        elif [ "$LINUX_DISTRO" = "arch" ] || [ "$LINUX_DISTRO" = "manjaro" ]; then
+            # Arch Linux: versions are typically managed by pacman
+            if [ -x "/usr/bin/php" ]; then
+                # Check if it's the right version
+                installed_version=$(php -v 2>/dev/null | awk '/^PHP/ {print $2}' | cut -d. -f1,2)
+                if [ "$installed_version" = "$version" ]; then
+                    phpvm_debug "PHP $version already active on Arch Linux"
+                else
+                    phpvm_warn "PHP $version may not be the active version. Arch typically has one PHP version."
+                    phpvm_warn "Current version: $installed_version, requested: $version"
+                fi
+            else
+                phpvm_err "No PHP binary found. Install with: sudo pacman -S php"
+                return 1
+            fi
+
+        elif [ "$PKG_MANAGER" = "dnf" ] || [ "$PKG_MANAGER" = "yum" ]; then
+            # RHEL/Fedora: may use alternatives or modules
+            if command -v dnf >/dev/null 2>&1 && dnf module list php >/dev/null 2>&1; then
+                # Try dnf modules for RHEL 8+
+                phpvm_debug "Attempting to enable PHP $version module"
+                if ! run_with_sudo dnf module enable php:$version -y; then
+                    phpvm_warn "Failed to enable PHP $version module. Trying direct binary switch..."
+                fi
+            fi
+
+            # Fallback to binary switching
+            php_binary="/usr/bin/php$version"
+            if [ -f "$php_binary" ]; then
+                if command -v update-alternatives >/dev/null 2>&1; then
+                    run_with_sudo update-alternatives --set php "$php_binary" || {
+                        phpvm_err "Failed to switch to PHP $version."
+                        return 1
+                    }
+                fi
+            else
+                phpvm_err "PHP binary for version $version not found at $php_binary"
+                return 1
+            fi
+
         else
-            phpvm_err "update-alternatives command not found. Cannot switch PHP versions on this system."
+            phpvm_err "Cannot switch PHP versions on this system. No supported method found."
+            phpvm_warn "System: $LINUX_DISTRO $LINUX_VERSION, Package Manager: $PKG_MANAGER"
             return 1
         fi
         ;;
@@ -322,40 +723,63 @@ system_php_version() {
     return $?
 }
 
-# Auto-switch PHP version based on .phpvmrc file
-auto_switch_php_version() {
+# Find .phpvmrc file in current or parent directories
+find_phpvmrc() {
     current_dir="$PWD"
-    found=0
     depth=0
     max_depth=5
 
     while [ "$current_dir" != "/" ] && [ $depth -lt $max_depth ]; do
         if [ -f "$current_dir/.phpvmrc" ]; then
-            if ! version=$(tr -d '[:space:]' <"$current_dir/.phpvmrc"); then
-                phpvm_err "Failed to read $current_dir/.phpvmrc"
-                return 1
-            fi
-            if [ -n "$version" ]; then
-                phpvm_echo "Auto-switching to PHP $version (from $current_dir/.phpvmrc)"
-                if ! use_php_version "$version"; then
-                    phpvm_err "Failed to switch to PHP $version from $current_dir/.phpvmrc"
-                    return 1
-                fi
-            else
-                phpvm_warn "No valid PHP version found in $current_dir/.phpvmrc."
-                return 1
-            fi
-            found=1
-            break
+            echo "$current_dir/.phpvmrc"
+            return 0
         fi
         current_dir=$(dirname "$current_dir")
         depth=$((depth + 1))
     done
+    return 1
+}
 
-    if [ $found -eq 0 ]; then
+# Auto-switch PHP version based on .phpvmrc file
+auto_switch_php_version() {
+    local phpvmrc_file
+    local version
+
+    if ! phpvmrc_file=$(find_phpvmrc); then
         phpvm_warn "No .phpvmrc file found in the current or parent directories."
         return 1
     fi
+
+    # Validate .phpvmrc file exists and is readable
+    if [ ! -r "$phpvmrc_file" ]; then
+        phpvm_err "Cannot read $phpvmrc_file"
+        return 1
+    fi
+
+    # Read and validate version from .phpvmrc
+    if ! version=$(tr -d '[:space:]' <"$phpvmrc_file" 2>/dev/null); then
+        phpvm_err "Failed to read $phpvmrc_file"
+        return 1
+    fi
+
+    # Validate version is not empty and contains only valid characters
+    if [ -z "$version" ]; then
+        phpvm_warn "No valid PHP version found in $phpvmrc_file."
+        return 1
+    fi
+
+    # Basic validation for PHP version format (X.Y or system)
+    if ! echo "$version" | grep -qE '^([0-9]+\.[0-9]+|system)$'; then
+        phpvm_err "Invalid PHP version format in $phpvmrc_file: $version"
+        return 1
+    fi
+
+    phpvm_echo "Auto-switching to PHP $version (from $phpvmrc_file)"
+    if ! use_php_version "$version"; then
+        phpvm_err "Failed to switch to PHP $version from $phpvmrc_file"
+        return 1
+    fi
+
     return 0
 }
 
@@ -443,6 +867,7 @@ Usage:
   phpvm list               List installed PHP versions
   phpvm help               Show this help message
   phpvm test               Run self-tests to verify functionality
+  phpvm info               Show system information for debugging
   phpvm version            Show version information
 
 Examples:
@@ -464,6 +889,85 @@ Repository: https://github.com/Thavarshan/phpvm
 
 Usage: phpvm help
 EOF
+}
+
+# Print system information for debugging
+print_system_info() {
+    phpvm_echo "System Information:"
+    echo ""
+
+    # Get OS information
+    get_os_info
+
+    # Basic system info
+    echo "OS Type: $OS_TYPE"
+    echo "Architecture: $OS_ARCH"
+
+    if [ "$OS_TYPE" = "Darwin" ]; then
+        echo "macOS Version: ${MACOS_VERSION:-Unknown}"
+        echo "macOS Major: ${MACOS_MAJOR:-Unknown}"
+        echo "macOS Minor: ${MACOS_MINOR:-Unknown}"
+
+        if command -v brew >/dev/null 2>&1; then
+            echo "Homebrew: Installed"
+            echo "Homebrew Prefix: ${HOMEBREW_PREFIX:-Unknown}"
+            echo "Homebrew Version: $(brew --version 2>/dev/null | head -1 || echo 'Unknown')"
+        else
+            echo "Homebrew: Not installed"
+        fi
+    elif [ "$OS_TYPE" = "Linux" ]; then
+        echo "Linux Distribution: ${LINUX_DISTRO:-Unknown}"
+        echo "Linux Version: ${LINUX_VERSION:-Unknown}"
+        echo "WSL: ${IS_WSL:-false}"
+        if [ "$IS_WSL" = "true" ]; then
+            echo "WSL Version: ${WSL_VERSION:-Unknown}"
+        fi
+
+        echo ""
+        echo "Available Package Managers:"
+        command -v apt-get >/dev/null 2>&1 && echo "  - apt-get: Available"
+        command -v dnf >/dev/null 2>&1 && echo "  - dnf: Available"
+        command -v yum >/dev/null 2>&1 && echo "  - yum: Available"
+        command -v pacman >/dev/null 2>&1 && echo "  - pacman: Available"
+        command -v brew >/dev/null 2>&1 && echo "  - brew (Linuxbrew): Available"
+
+        if command -v update-alternatives >/dev/null 2>&1; then
+            echo "  - update-alternatives: Available"
+        fi
+    fi
+
+    echo ""
+    echo "PHP Information:"
+    if command -v php >/dev/null 2>&1; then
+        echo "Current PHP: $(php -v 2>/dev/null | head -1 || echo 'Error getting version')"
+        echo "PHP Binary: $(command -v php)"
+    else
+        echo "Current PHP: Not installed or not in PATH"
+    fi
+
+    if command -v php-config >/dev/null 2>&1; then
+        echo "PHP Config: Available"
+    else
+        echo "PHP Config: Not available"
+    fi
+
+    echo ""
+    echo "phpvm Configuration:"
+    echo "phpvm Directory: $PHPVM_DIR"
+    echo "PHP Binary Path: ${PHP_BIN_PATH:-Not set}"
+    echo "Package Manager: ${PKG_MANAGER:-Not detected}"
+
+    if [ -f "$PHPVM_ACTIVE_VERSION_FILE" ]; then
+        echo "Active Version: $(cat "$PHPVM_ACTIVE_VERSION_FILE")"
+    else
+        echo "Active Version: None set"
+    fi
+
+    echo ""
+    echo "Environment Variables:"
+    echo "DEBUG: ${DEBUG:-false}"
+    echo "PHPVM_TEST_MODE: ${PHPVM_TEST_MODE:-false}"
+    echo "PHPVM_AUTO_USE: ${PHPVM_AUTO_USE:-true}"
 }
 
 # Self-tests for phpvm functionality
@@ -794,8 +1298,10 @@ EOF
     total=$((total + 1))
     test_function "corrupted .phpvmrc handling" test_corrupted_phpvmrc || failed=$((failed + 1))
 
-    # Clean up
-    rm -rf "$TEST_DIR"
+    # Clean up - ensure TEST_DIR is not empty and is a temp directory
+    if [ -n "$TEST_DIR" ] && [ "$TEST_DIR" != "/" ] && [ "$TEST_DIR" != "$HOME" ]; then
+        rm -rf "$TEST_DIR"
+    fi
 
     # Print results
     passed=$((total - failed))
@@ -841,7 +1347,10 @@ uninstall_php() {
             return 1
             ;;
         esac
-        rm -rf "$mock_dir"
+        # Safely remove mock directory only if it's in our test prefix
+        if [ -n "$mock_dir" ] && [ "$mock_dir" != "/" ] && echo "$mock_dir" | grep -q "^${TEST_PREFIX:-/tmp}"; then
+            rm -rf "$mock_dir"
+        fi
         phpvm_echo "PHP $version uninstalled."
         return 0
     fi
@@ -965,6 +1474,9 @@ main() {
         ;;
     test)
         run_tests
+        ;;
+    info | sysinfo)
+        print_system_info
         ;;
     *)
         phpvm_err "Unknown command: $command"

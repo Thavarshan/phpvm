@@ -211,32 +211,102 @@ If you experience issues with `phpvm`, try the following:
 
 ## Development & Testing
 
-- This project includes a set of BATS unit tests located in the repository (e.g., `test_phpvm.bats`).
-- v1.5.0 introduces significant cross-platform compatibility improvements, especially for WSL and Linux systems.
-- Enhanced error handling and validation with post-install checks for binary availability.
-- Improved Homebrew integration with better link failure detection and recovery.
-- Contributions, bug reports, and feature requests are welcome.
-- The codebase now includes helper functions for better maintainability and reduced duplication.
+phpvm features comprehensive testing across multiple platforms and scenarios. The project includes extensive GitHub Actions workflows that test every aspect of the script.
 
-### Testing
+### Built-in Testing
 
 phpvm includes built-in self-tests that validate all core functionality:
 
 ```sh
 # Run the built-in tests
 phpvm test
+
+# Get detailed system information for debugging
+phpvm info
 ```
 
-The test framework verifies:
+The built-in test framework verifies:
 
 - Output and formatting functions
-- System detection
+- System detection and OS compatibility
 - PHP version installation (mocked)
-- Version switching
+- Version switching and validation
 - Auto-switching based on .phpvmrc
+- Input validation and security
 - System PHP integration
 
-These tests can be run in any environment with a shell and don't require external testing frameworks.
+### Comprehensive GitHub Actions Testing
+
+The project includes multiple specialized testing workflows:
+
+#### 1. **Comprehensive Distribution Testing** (`.github/workflows/comprehensive-test.yml`)
+Tests across multiple Linux distributions and scenarios:
+- **Ubuntu**: 20.04, 22.04, 24.04
+- **Debian**: 11 (Bullseye), 12 (Bookworm)
+- **RHEL/CentOS**: Rocky Linux 8 & 9, AlmaLinux 8 & 9
+- **Fedora**: 38, 39
+- **Arch Linux**: Latest
+- **Alpine Linux**: 3.18, 3.19
+- **macOS**: Intel (13) and Apple Silicon (14, latest)
+
+#### 2. **Security Testing** (`.github/workflows/security-test.yml`)
+Comprehensive security validation including:
+- Input validation and injection prevention
+- Path traversal protection
+- Privilege escalation prevention
+- Buffer overflow protection
+- File permission security
+- Environment variable security
+- Symlink attack prevention
+
+#### 3. **Performance Testing** (`.github/workflows/performance-test.yml`)
+Performance and load testing including:
+- Baseline performance measurements
+- Memory usage analysis
+- Concurrent operations testing
+- High-frequency operations
+- Scalability testing
+- Memory leak detection
+
+#### 4. **Integration Testing** (`.github/workflows/integration-test.yml`)
+End-to-end integration testing including:
+- Real-world scenario simulation
+- Multi-version workflows
+- Cross-platform compatibility
+- Installation simulation
+- Documentation validation
+
+#### 5. **Legacy Testing** (`.github/workflows/test.yml`)
+Original testing workflow for basic functionality validation.
+
+### Testing Coverage
+
+The testing suite covers:
+
+- **All supported Linux distributions** with their native package managers
+- **macOS versions** across Intel and Apple Silicon architectures
+- **WSL environments** (Windows Subsystem for Linux)
+- **Package managers**: apt, dnf, yum, pacman, Homebrew, Linuxbrew
+- **Security scenarios**: malicious input, path traversal, privilege escalation
+- **Performance scenarios**: load testing, memory usage, scalability
+- **Edge cases**: corrupted files, permission issues, network failures
+- **Error recovery**: state corruption, missing dependencies
+
+### Running Tests Locally
+
+```sh
+# Run built-in tests
+./phpvm.sh test
+
+# Test input validation
+./phpvm.sh install "invalid..version"  # Should fail gracefully
+
+# Test system information
+./phpvm.sh info
+
+# Test with debug output
+DEBUG=true ./phpvm.sh version
+```
 
 ### Debugging
 
