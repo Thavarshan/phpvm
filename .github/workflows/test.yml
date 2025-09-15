@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main, development]
   workflow_dispatch:
+  schedule:
+    # Run weekly regression tests
+    - cron: '0 2 * * 1'
 
 jobs:
   # Syntax and Static Analysis
@@ -138,3 +141,151 @@ jobs:
           time ./phpvm.sh help >/dev/null
           time ./phpvm.sh list >/dev/null
           echo "✅ Performance check completed"
+
+  # PHP Installation and Usage Testing
+  php-usage-test:
+    name: PHP Usage Test
+    runs-on: ${{ matrix.os }}
+    needs: syntax-check
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Homebrew (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential curl file git
+          NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.bashrc
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+
+      - name: Test PHP Installation Flow
+        run: |
+          chmod +x phpvm.sh
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          fi
+
+          echo "=== Testing PHP Installation ==="
+          ./phpvm.sh install 8.3 || echo "PHP 8.3 installation attempted"
+
+      - name: Test PHP Version Operations
+        run: |
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          fi
+
+          echo "=== Testing Version Operations ==="
+          ./phpvm.sh use 8.3 || echo "Switch to 8.3 attempted"
+          ./phpvm.sh list
+          ./phpvm.sh system || echo "System switch attempted"
+
+      - name: Test Project Auto-Switch
+        run: |
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          fi
+
+          echo "=== Testing Project Auto-Switch ==="
+          mkdir -p test_project
+          echo "8.3" > test_project/.phpvmrc
+          cd test_project
+          ../phpvm.sh auto || echo "Auto-switch attempted"
+          cd ..
+
+  # Extended Testing including Distribution Matrix
+  extended-test:
+    name: Extended Test (${{ matrix.distro }})
+    runs-on: ubuntu-latest
+    needs: syntax-check
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: ubuntu:22.04
+            package_manager: apt
+          - distro: fedora:39
+            package_manager: dnf
+          - distro: archlinux:latest
+            package_manager: pacman
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Run Extended Tests in Container
+        run: |
+          docker run --rm -v $PWD:/workspace -w /workspace ${{ matrix.distro }} bash -c "
+            set -e
+
+            # Update package manager and install dependencies
+            case '${{ matrix.package_manager }}' in
+              apt)
+                apt-get update -y
+                apt-get install -y curl wget sudo procps grep sed awk coreutils
+                ;;
+              dnf)
+                dnf update -y
+                dnf install -y curl wget sudo procps grep sed gawk coreutils which
+                ;;
+              pacman)
+                pacman -Sy --noconfirm
+                pacman -S --noconfirm curl wget sudo procps grep sed gawk coreutils which
+                ;;
+            esac
+
+            chmod +x ./phpvm.sh
+
+            echo '=== Testing Basic Functionality ==='
+            ./phpvm.sh version
+            ./phpvm.sh help
+            ./phpvm.sh list || echo 'List command completed'
+
+            echo '=== Running Self-Tests ==='
+            ./phpvm.sh test
+
+            echo '=== Testing Input Validation ==='
+            if ./phpvm.sh install 'invalid..version' 2>/dev/null; then
+              echo '❌ Should have rejected invalid version'
+              exit 1
+            else
+              echo '✅ Correctly rejected invalid version'
+            fi
+
+            echo '✅ Extended tests completed for ${{ matrix.distro }}!'
+          "
+
+  # Performance and Load Testing
+  performance-test:
+    name: Performance Test
+    runs-on: ubuntu-latest
+    needs: syntax-check
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Performance Benchmarks
+        run: |
+          chmod +x ./phpvm.sh
+
+          echo "=== Performance Testing ==="
+
+          # Test startup time
+          echo "Measuring startup time (5 iterations):"
+          for i in {1..5}; do
+            time ./phpvm.sh version >/dev/null
+          done
+
+          # Test concurrent operations
+          echo "Testing 10 concurrent operations:"
+          for i in {1..10}; do
+            ./phpvm.sh version >/dev/null &
+          done
+          wait
+
+          echo "✅ Performance tests completed"
