@@ -50,7 +50,7 @@ PHP 8.1.13
 - Post-install validation with helpful warnings for missing binaries.
 - Enhanced Homebrew integration with better link failure detection.
 - Informative, color-coded feedback with timestamps for logs.
-- Includes unit tests with BATS for automated testing.
+- Built-in self-tests for verifying functionality (`phpvm test`).
 - Helper functions for better maintainability and reduced code duplication.
 
 ## Installation

@@ -1,5 +1,39 @@
 # Release Notes
 
+## [v1.7.0](https://github.com/Thavarshan/phpvm/compare/v1.6.0...v1.7.0) - 2025-12-10
+
+### Added
+
+- **New `phpvm current` command:** Display the currently active PHP version. Returns the version string, "system", or "none" depending on state.
+- **New `phpvm which [version]` command:** Show the full path to the PHP binary for a given version. Supports all package managers (brew, apt, dnf, yum, pacman).
+- **New `phpvm deactivate` command:** Temporarily disable phpvm management and restore the original PATH. Useful for debugging or temporarily using system defaults.
+- **New `ls` alias for `list`:** Added `phpvm ls` as an alias for `phpvm list` for convenience.
+- **Specific exit codes:** Implemented consistent exit codes across all commands for better scripting support:
+  - `0` - Success
+  - `1` - General error
+  - `2` - Invalid argument or usage error
+  - `3` - Version not found (not available)
+  - `4` - Version not installed locally
+  - `5` - File or permission error
+  - `127` - Unknown command
+- **Exit code documentation:** Added exit codes section to help output.
+- **PATH preservation:** `phpvm use` now stores the original PATH on first activation to enable proper deactivation.
+
+### Changed
+
+- **Enhanced help output:** Updated help text with new commands, examples, and exit code documentation.
+- **Improved error handling:** Key functions now return specific exit codes instead of generic error codes.
+
+### Internal
+
+- **Added exit code constants:** Defined `PHPVM_EXIT_*` constants for maintainability.
+- **New helper functions:**
+  - `phpvm_store_original_path()` - Preserves PATH for deactivate functionality
+  - `phpvm_current()` - Returns current PHP version
+  - `phpvm_which()` - Resolves PHP binary paths
+  - `phpvm_deactivate()` - Disables phpvm temporarily
+- **Expanded test suite:** Added tests for `phpvm_current`, `phpvm_which`, and `phpvm_deactivate` (now 14 tests total).
+
 ## [v1.6.0](https://github.com/Thavarshan/phpvm/compare/v1.5.0...v1.6.0) - 2025-09-15
 
 ### Added
