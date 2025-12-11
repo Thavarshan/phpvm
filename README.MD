@@ -89,18 +89,21 @@ If the installation was successful, it should output the path to `phpvm`.
 
 ### Available Commands
 
-| Command                   | Description                           |
-| ------------------------- | ------------------------------------- |
-| `phpvm install <version>` | Install a specific PHP version        |
-| `phpvm use <version>`     | Switch to a specific PHP version      |
-| `phpvm system`            | Switch to system/Homebrew default PHP |
-| `phpvm list`              | List all installed PHP versions       |
-| `phpvm auto`              | Auto-switch based on `.phpvmrc` file  |
-| `phpvm test`              | Run built-in self-tests               |
-| `phpvm version`           | Show version information              |
-| `phpvm --version`         | Show version information (alias)      |
-| `phpvm -v`                | Show version information (alias)      |
-| `phpvm help`              | Show help message                     |
+| Command                    | Description                                |
+| -------------------------- | ------------------------------------------ |
+| `phpvm install <version>`  | Install a specific PHP version             |
+| `phpvm use <version>`      | Switch to a specific PHP version           |
+| `phpvm current`            | Display the currently active PHP version   |
+| `phpvm which [version]`    | Show the path to PHP binary for a version  |
+| `phpvm deactivate`         | Temporarily disable phpvm and restore PATH |
+| `phpvm system`             | Switch to system/Homebrew default PHP      |
+| `phpvm list` or `phpvm ls` | List all installed PHP versions            |
+| `phpvm auto`               | Auto-switch based on `.phpvmrc` file       |
+| `phpvm test`               | Run built-in self-tests                    |
+| `phpvm version`            | Show version information                   |
+| `phpvm --version`          | Show version information (alias)           |
+| `phpvm -v`                 | Show version information (alias)           |
+| `phpvm help`               | Show help message                          |
 
 ### Installing PHP Versions
 
@@ -131,6 +134,40 @@ Verify the active version with:
 ```sh
 php -v
 ```
+
+### Checking Current PHP Version
+
+To see which PHP version is currently active:
+
+```sh
+phpvm current
+```
+
+This will display the active PHP version, "system" (if using system PHP), or "none" (if no PHP is active).
+
+### Finding PHP Binary Paths
+
+To find the path to a PHP binary for any version:
+
+```sh
+# Show path for a specific version
+phpvm which 8.2
+
+# Show path for current version
+phpvm which
+```
+
+This works across all package managers (Homebrew, apt, dnf, yum, pacman) and is useful for IDE configuration or scripting.
+
+### Temporarily Disabling phpvm
+
+To temporarily disable phpvm and restore your original PATH:
+
+```sh
+phpvm deactivate
+```
+
+This is useful for debugging or when you need to use the system default PHP temporarily. To re-enable phpvm, simply use `phpvm use <version>` again.
 
 ### Version Information
 
@@ -179,6 +216,31 @@ phpvm test
 ```
 
 This will run a series of tests on your system to ensure all phpvm functions are working properly.
+
+### Exit Codes
+
+phpvm uses specific exit codes for better scripting support:
+
+| Exit Code | Meaning                           |
+| --------- | --------------------------------- |
+| `0`       | Success                           |
+| `1`       | General error                     |
+| `2`       | Invalid argument or usage error   |
+| `3`       | Version not found (not available) |
+| `4`       | Version not installed locally     |
+| `5`       | File or permission error          |
+| `127`     | Unknown command                   |
+
+Example usage in scripts:
+
+```sh
+phpvm use 8.2
+if [ $? -eq 0 ]; then
+    echo "Successfully switched to PHP 8.2"
+else
+    echo "Failed to switch PHP version"
+fi
+```
 
 ## Uninstallation
 
@@ -293,7 +355,9 @@ The built-in test framework verifies:
 The project features a streamlined CI/CD pipeline with comprehensive testing workflows:
 
 #### 1. **Core Testing** (`.github/workflows/test.yml`)
+
 Comprehensive testing workflow including:
+
 - **Multi-Distribution Testing**: 13 Linux distributions across 4 package managers
   - **Ubuntu**: 20.04, 22.04, 24.04
   - **Debian**: 11 (Bullseye), 12 (Bookworm)
@@ -306,7 +370,9 @@ Comprehensive testing workflow including:
 - **Integration Testing**: End-to-end workflows, installation simulation, error recovery
 
 #### 2. **Security Testing** (`.github/workflows/security-test.yml`)
+
 Specialized security validation including:
+
 - Input validation and injection prevention
 - Path traversal protection
 - Privilege escalation prevention
@@ -316,6 +382,7 @@ Specialized security validation including:
 - Symlink attack prevention
 
 #### 3. **Release Validation** (`.github/workflows/release.yml`)
+
 Release testing and validation for new versions.
 
 ### Testing Coverage
