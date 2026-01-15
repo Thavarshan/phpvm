@@ -15,7 +15,7 @@
 
 ```sh
 $ phpvm version
-phpvm version 1.5.0
+phpvm version 1.7.0
 
 PHP Version Manager for macOS and Linux
 Author: Jerome Thayananthajothy <tjthavarshan@gmail.com>
@@ -40,6 +40,8 @@ PHP 8.1.13
 - Install and manage multiple PHP versions.
 - Seamlessly switch between installed PHP versions.
 - Auto-switch PHP versions based on project `.phpvmrc`.
+- Alias management for versions (`phpvm alias`, `phpvm unalias`).
+- Cache directory inspection (`phpvm cache dir`).
 - Supports macOS (via Homebrew) and Linux distributions including WSL.
 - **Smart repository detection** for RHEL/Fedora systems with automatic setup guidance.
 - **Enhanced error handling** with actionable solutions when PHP packages are missing.
@@ -98,6 +100,9 @@ If the installation was successful, it should output the path to `phpvm`.
 | `phpvm deactivate`         | Temporarily disable phpvm and restore PATH |
 | `phpvm system`             | Switch to system/Homebrew default PHP      |
 | `phpvm list` or `phpvm ls` | List all installed PHP versions            |
+| `phpvm alias [name] [ver]` | Create, update, or list version aliases    |
+| `phpvm unalias <name>`     | Remove version alias                       |
+| `phpvm cache dir`          | Show phpvm cache directory                 |
 | `phpvm auto`               | Auto-switch based on `.phpvmrc` file       |
 | `phpvm test`               | Run built-in self-tests                    |
 | `phpvm version`            | Show version information                   |
@@ -206,6 +211,46 @@ phpvm list
 ```
 
 This will show all installed PHP versions and indicate the currently active one.
+
+### Managing Aliases
+
+Create or update a version alias:
+
+```sh
+phpvm alias default 8.2
+phpvm alias production 8.1
+```
+
+List aliases:
+
+```sh
+phpvm alias
+```
+
+Remove an alias:
+
+```sh
+phpvm unalias production
+```
+
+Aliases also appear in `phpvm list` output when defined.
+
+### Cache Directory
+
+Show the phpvm cache directory:
+
+```sh
+phpvm cache dir
+```
+
+### Planned Commands (Coming Soon)
+
+The following commands are in progress and may return a "not yet implemented" message:
+
+- `phpvm exec <version> <command> [args...]`
+- `phpvm run <version> [script] [args...]`
+- `phpvm ls-remote [pattern]`
+- `phpvm cache clear`
 
 ### Running Self-Tests
 
