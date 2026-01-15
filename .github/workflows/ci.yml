@@ -7,7 +7,7 @@ on:
     branches: [main, development]
   workflow_dispatch:
   schedule:
-    # Weekly comprehensive tests including security scans
+    # Weekly comprehensive tests including security scans (Mondays at 2 AM UTC)
     - cron: '0 2 * * 1'
 
 jobs:
