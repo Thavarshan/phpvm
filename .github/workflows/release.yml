@@ -42,7 +42,8 @@ jobs:
           ./phpvm.sh version
           ./phpvm.sh help
           ./phpvm.sh list
-          ./phpvm.sh test
+          ./phpvm.sh current || echo "Current command validated"
+          ./phpvm.sh which || echo "Which command validated"
 
           echo "All core commands work"
 

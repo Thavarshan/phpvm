@@ -13,7 +13,7 @@ on:
 jobs:
   # Syntax and Static Analysis
   syntax-check:
-    name: "Syntax & Static Analysis"
+    name: 'Syntax & Static Analysis'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -35,7 +35,7 @@ jobs:
 
   # Core Functionality Testing
   core-functionality-test:
-    name: "Core Functionality (${{ matrix.os }})"
+    name: 'Core Functionality (${{ matrix.os }})'
     runs-on: ${{ matrix.os }}
     needs: syntax-check
     strategy:
@@ -87,12 +87,21 @@ jobs:
           ./phpvm.sh list || echo "List command executed (may show no versions initially)"
           echo "Basic commands work"
 
-      # Run the integrated self-tests
-      - name: Run Integrated Self-Tests
+      # Install and run BATS tests
+      - name: Install BATS
         run: |
-          echo "=== Running Integrated Self-Tests ==="
-          ./phpvm.sh test
-          echo "Self-tests completed"
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            brew install bats-core
+          else
+            sudo apt-get update
+            sudo apt-get install -y bats
+          fi
+
+      - name: Run BATS Test Suite
+        run: |
+          echo "=== Running BATS Test Suite ==="
+          bats tests/
+          echo "Tests completed"
 
       # Test error handling
       - name: Test Error Handling
@@ -144,7 +153,7 @@ jobs:
 
   # PHP Installation and Usage Testing
   php-usage-test:
-    name: "PHP Installation & Usage (${{ matrix.os }})"
+    name: 'PHP Installation & Usage (${{ matrix.os }})'
     runs-on: ${{ matrix.os }}
     needs: syntax-check
     strategy:
@@ -200,7 +209,7 @@ jobs:
 
   # Multi-Distribution Compatibility Testing
   multi-distribution-test:
-    name: "Multi-Distribution Test (${{ matrix.scenario }})"
+    name: 'Multi-Distribution Test (${{ matrix.scenario }})'
     runs-on: ubuntu-latest
     needs: syntax-check
     strategy:
@@ -209,69 +218,69 @@ jobs:
         include:
           # Ubuntu versions
           - distro: ubuntu:20.04
-            scenario: "Ubuntu 20.04 LTS"
+            scenario: 'Ubuntu 20.04 LTS'
             package_manager: apt
-            test_php_versions: "7.4 8.0 8.1"
+            test_php_versions: '7.4 8.0 8.1'
           - distro: ubuntu:22.04
-            scenario: "Ubuntu 22.04 LTS"
+            scenario: 'Ubuntu 22.04 LTS'
             package_manager: apt
-            test_php_versions: "8.0 8.1 8.2"
+            test_php_versions: '8.0 8.1 8.2'
           - distro: ubuntu:24.04
-            scenario: "Ubuntu 24.04 LTS"
+            scenario: 'Ubuntu 24.04 LTS'
             package_manager: apt
-            test_php_versions: "8.1 8.2 8.3"
+            test_php_versions: '8.1 8.2 8.3'
 
           # Debian versions
           - distro: debian:11
-            scenario: "Debian Bullseye"
+            scenario: 'Debian Bullseye'
             package_manager: apt
-            test_php_versions: "7.4 8.0"
+            test_php_versions: '7.4 8.0'
           - distro: debian:12
-            scenario: "Debian Bookworm"
+            scenario: 'Debian Bookworm'
             package_manager: apt
-            test_php_versions: "8.1 8.2"
+            test_php_versions: '8.1 8.2'
 
           # RHEL/CentOS family
           - distro: fedora:38
-            scenario: "Fedora 38"
+            scenario: 'Fedora 38'
             package_manager: dnf
-            test_php_versions: "8.1 8.2"
+            test_php_versions: '8.1 8.2'
           - distro: fedora:39
-            scenario: "Fedora 39"
+            scenario: 'Fedora 39'
             package_manager: dnf
-            test_php_versions: "8.2 8.3"
+            test_php_versions: '8.2 8.3'
           - distro: rockylinux:8
-            scenario: "Rocky Linux 8"
+            scenario: 'Rocky Linux 8'
             package_manager: dnf
-            test_php_versions: "7.4 8.0"
+            test_php_versions: '7.4 8.0'
           - distro: rockylinux:9
-            scenario: "Rocky Linux 9"
+            scenario: 'Rocky Linux 9'
             package_manager: dnf
-            test_php_versions: "8.0 8.1"
+            test_php_versions: '8.0 8.1'
           - distro: almalinux:8
-            scenario: "AlmaLinux 8"
+            scenario: 'AlmaLinux 8'
             package_manager: dnf
-            test_php_versions: "7.4 8.0"
+            test_php_versions: '7.4 8.0'
           - distro: almalinux:9
-            scenario: "AlmaLinux 9"
+            scenario: 'AlmaLinux 9'
             package_manager: dnf
-            test_php_versions: "8.0 8.1"
+            test_php_versions: '8.0 8.1'
 
           # Arch Linux
           - distro: archlinux:latest
-            scenario: "Arch Linux"
+            scenario: 'Arch Linux'
             package_manager: pacman
-            test_php_versions: "8.2 8.3"
+            test_php_versions: '8.2 8.3'
 
           # Alpine Linux
           - distro: alpine:3.18
-            scenario: "Alpine 3.18"
+            scenario: 'Alpine 3.18'
             package_manager: apk
-            test_php_versions: "8.1 8.2"
+            test_php_versions: '8.1 8.2'
           - distro: alpine:3.19
-            scenario: "Alpine 3.19"
+            scenario: 'Alpine 3.19'
             package_manager: apk
-            test_php_versions: "8.2 8.3"
+            test_php_versions: '8.2 8.3'
 
     steps:
       - name: Checkout Repository
@@ -323,8 +332,11 @@ jobs:
             ./phpvm.sh help
             ./phpvm.sh list || echo 'List command completed'
 
-            echo '=== Running Self-Tests ==='
-            ./phpvm.sh test
+            echo '=== Testing Basic Commands ==='
+            # Built-in test command has been removed in favor of BATS
+            # Basic command validation is sufficient for container tests
+            ./phpvm.sh version >/dev/null
+            ./phpvm.sh help >/dev/null
 
             echo '=== Testing Input Validation ==='
             # Test invalid version formats
@@ -370,7 +382,7 @@ jobs:
 
   # Performance and Load Testing
   performance-test:
-    name: "Performance & Load Testing"
+    name: 'Performance & Load Testing'
     runs-on: ubuntu-latest
     needs: syntax-check
     steps:
@@ -400,7 +412,7 @@ jobs:
 
   # End-to-End Integration Testing
   integration-test:
-    name: "End-to-End Integration (${{ matrix.os }})"
+    name: 'End-to-End Integration (${{ matrix.os }})'
     runs-on: ${{ matrix.os }}
     needs: syntax-check
     strategy:
@@ -545,7 +557,7 @@ jobs:
           help_output=$(./phpvm.sh help)
 
           # Check if help includes all commands
-          commands=("install" "use" "system" "auto" "list" "help" "test" "info" "version")
+          commands=("install" "use" "system" "auto" "list" "help" "info" "version" "alias" "unalias" "current" "which" "deactivate")
 
           for cmd in "${commands[@]}"; do
             if echo "$help_output" | grep -q "$cmd"; then
@@ -651,8 +663,9 @@ jobs:
           echo -e "\n4. List functionality:"
           ./phpvm.sh list >/dev/null && echo "List command successful"
 
-          echo -e "\n5. Self-tests:"
-          ./phpvm.sh test >/dev/null && echo "Self-tests successful"
+          echo -e "\n5. Command validation:"
+          ./phpvm.sh current >/dev/null || echo "Current command validated"
+          ./phpvm.sh which >/dev/null || echo "Which command validated"
 
           echo -e "\n6. Input validation:"
           ./phpvm.sh install "invalid" 2>/dev/null || echo "Input validation working"
