@@ -396,6 +396,14 @@ phpvm_resolve_version() {
         return 1
     fi
 
+    # Resolve special keywords
+    if [ "$input" = "latest" ] || [ "$input" = "stable" ]; then
+        if resolved=$(phpvm_get_latest_installed_version); then
+            echo "$resolved"
+            return 0
+        fi
+    fi
+
     # Check alias file first
     if [ -f "$PHPVM_DIR/alias/$input" ]; then
         resolved=$(command cat "$PHPVM_DIR/alias/$input" 2>/dev/null | command tr -d '[:space:]')
@@ -409,6 +417,70 @@ phpvm_resolve_version() {
     # No alias found, return input as-is
     echo "$input"
     return 0
+}
+
+# Get latest installed PHP version (best-effort)
+phpvm_get_latest_installed_version() {
+    local versions=()
+    local version
+    local latest
+
+    if [ "${PHPVM_TEST_MODE}" = "true" ]; then
+        # Test mode: use test prefix paths
+        for path in "${TEST_PREFIX:-/tmp}/opt/homebrew/Cellar/php"*; do
+            if [ -d "$path" ]; then
+                version=$(basename "$path")
+                version=${version#php@}
+                [ "$version" = "php" ] && continue
+                versions+=("$version")
+            fi
+        done
+    else
+        case "$PKG_MANAGER" in
+            brew)
+                if [ -d "$HOMEBREW_PREFIX/Cellar" ]; then
+                    for path in "$HOMEBREW_PREFIX/Cellar/php"*; do
+                        if [ -d "$path" ]; then
+                            version=$(basename "$path")
+                            if [ "$version" = "php" ]; then
+                                version=$(get_installed_php_version)
+                            else
+                                version=${version#php@}
+                            fi
+                            [ -n "$version" ] && versions+=("$version")
+                        fi
+                    done
+                fi
+                ;;
+            apt)
+                while read -r version; do
+                    versions+=("$version")
+                done < <(dpkg-query -W -f='${Package}\n' 2>/dev/null | grep -E '^php[0-9]+\.[0-9]+' | sed 's/^php//')
+                ;;
+            dnf | yum)
+                while read -r version; do
+                    versions+=("$version")
+                done < <($PKG_MANAGER list installed 2>/dev/null | grep -E 'php[0-9]+\.' | awk '{print $1}' | sed 's/^php//')
+                ;;
+            pacman)
+                while read -r version; do
+                    versions+=("$version")
+                done < <(pacman -Q 2>/dev/null | grep '^php' | awk '{print $1}' | sed 's/^php//')
+                ;;
+        esac
+    fi
+
+    if [ ${#versions[@]} -eq 0 ]; then
+        return 1
+    fi
+
+    latest=$(printf '%s\n' "${versions[@]}" | sort -V | tail -1)
+    if [ -n "$latest" ]; then
+        echo "$latest"
+        return 0
+    fi
+
+    return 1
 }
 
 # Check if Remi repository is available/enabled for RHEL/Fedora systems
@@ -1334,14 +1406,17 @@ auto_switch_php_version() {
         return 1
     fi
 
+    # Resolve aliases before validation
+    version=$(phpvm_resolve_version "$version")
+
     # Validate version is not empty and contains only valid characters
     if [ -z "$version" ]; then
         phpvm_warn "No valid PHP version found in $phpvmrc_file."
         return 1
     fi
 
-    # Basic validation for PHP version format (X.Y or system)
-    if ! echo "$version" | grep -qE '^([0-9]+\.[0-9]+|system)$'; then
+    # Validate version format (X.Y, X.Y.Z, or system)
+    if ! validate_php_version "$version"; then
         phpvm_err "Invalid PHP version format in $phpvmrc_file: $version"
         return 1
     fi
@@ -1857,6 +1932,17 @@ EOF
         [ $status -eq 0 ] && [ "$(cat $PHPVM_ACTIVE_VERSION_FILE)" = "7.4" ]
     }
 
+    # Test use default alias
+    test_use_default_alias() {
+        mkdir -p "$TEST_DIR/opt/homebrew/Cellar/php@8.2/bin"
+        phpvm_alias "default" "8.2" >/dev/null 2>&1 || return 1
+
+        use_php_version "default" >/dev/null
+        local status=$?
+
+        [ $status -eq 0 ] && [ "$(cat $PHPVM_ACTIVE_VERSION_FILE)" = "8.2" ]
+    }
+
     # Test system_php_version
     test_system_php_version() {
         system_php_version >/dev/null
@@ -1884,6 +1970,29 @@ EOF
 
         # Check for success and correct active version
         [ $status -eq 0 ] && [ "$(cat $PHPVM_ACTIVE_VERSION_FILE)" = "7.4" ]
+    }
+
+    # Test auto_switch_php_version with alias
+    test_auto_switch_alias() {
+        # Create mock installation
+        mkdir -p "$TEST_DIR/opt/homebrew/Cellar/php@8.1/bin"
+
+        # Create alias
+        phpvm_alias "default" "8.1" >/dev/null 2>&1 || return 1
+
+        # Create a project with .phpvmrc
+        mkdir -p "$HOME/alias_project"
+        echo "default" >"$HOME/alias_project/.phpvmrc"
+
+        # Change to the project directory
+        cd "$HOME/alias_project"
+
+        # Test auto-switching
+        auto_switch_php_version >/dev/null
+        local status=$?
+
+        # Check for success and correct active version
+        [ $status -eq 0 ] && [ "$(cat $PHPVM_ACTIVE_VERSION_FILE)" = "8.1" ]
     }
 
     # Test handling of corrupted .phpvmrc file
@@ -2102,10 +2211,16 @@ EOF
     test_function "use_php_version" test_use_php_version || failed=$((failed + 1))
 
     total=$((total + 1))
+    test_function "use default alias" test_use_default_alias || failed=$((failed + 1))
+
+    total=$((total + 1))
     test_function "system_php_version" test_system_php_version || failed=$((failed + 1))
 
     total=$((total + 1))
     test_function "auto_switch_php_version" test_auto_switch || failed=$((failed + 1))
+
+    total=$((total + 1))
+    test_function "auto_switch_php_version alias" test_auto_switch_alias || failed=$((failed + 1))
 
     total=$((total + 1))
     test_function "corrupted .phpvmrc handling" test_corrupted_phpvmrc || failed=$((failed + 1))
@@ -2308,6 +2423,16 @@ phpvm_alias() {
         return 0
     fi
 
+    # Pattern filter listing (phpvm alias <pattern>)
+    if [ -z "$version" ] && [ ! -f "$PHPVM_DIR/alias/$name" ]; then
+        phpvm_echo "Version aliases matching '$name':"
+        if phpvm_list_aliases "$name"; then
+            return 0
+        fi
+        echo "  (no aliases matched)"
+        return $PHPVM_EXIT_NOT_FOUND
+    fi
+
     # Show single alias
     if [ -z "$version" ]; then
         if [ -f "$PHPVM_DIR/alias/$name" ]; then
@@ -2415,10 +2540,16 @@ main() {
     case "$command" in
     use)
         if [ "$#" -eq 0 ]; then
-            phpvm_err "Missing PHP version argument for 'use' command."
-            exit $PHPVM_EXIT_INVALID_ARG
+            if [ -f "$PHPVM_DIR/alias/default" ]; then
+                use_php_version "default"
+            else
+                phpvm_err "Missing PHP version argument for 'use' command."
+                phpvm_warn "Set a default alias with: phpvm alias default <version>"
+                exit $PHPVM_EXIT_INVALID_ARG
+            fi
+        else
+            use_php_version "$@"
         fi
-        use_php_version "$@"
         ;;
     install)
         if [ "$#" -eq 0 ]; then

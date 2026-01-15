@@ -5,8 +5,11 @@
 ### Added
 
 - **Alias management commands:** Added `phpvm alias` and `phpvm unalias` for version alias creation, listing, and removal.
+- **Alias pattern filtering:** `phpvm alias <pattern>` now filters aliases by name.
 - **Alias resolution support:** Aliases now resolve in `phpvm install`, `phpvm use`, and `phpvm which`.
 - **Alias visibility:** `phpvm list` now shows configured aliases.
+- **Alias resolution in `.phpvmrc`:** `phpvm auto` now resolves aliases defined in `.phpvmrc`.
+- **Latest/stable keywords:** `latest` and `stable` now resolve to the latest installed PHP version.
 - **Quality assurance tooling:** Added ShellCheck and shfmt configuration, a QA Makefile, and a `qa.sh` runner script.
 - **BATS test suite:** Added comprehensive BATS tests for core functionality and new alias behavior.
 - **CI quality workflow:** Added a quality workflow for linting, formatting, and tests.

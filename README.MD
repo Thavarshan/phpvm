@@ -202,6 +202,13 @@ phpvm auto
 
 phpvm will automatically detect and switch to the version specified in the `.phpvmrc` file.
 
+Aliases can also be used in `.phpvmrc`:
+
+```sh
+echo "default" > .phpvmrc
+phpvm auto
+```
+
 ### Listing Installed Versions
 
 To list all installed PHP versions:
@@ -227,6 +234,12 @@ List aliases:
 phpvm alias
 ```
 
+List aliases matching a pattern:
+
+```sh
+phpvm alias def
+```
+
 Remove an alias:
 
 ```sh
@@ -234,6 +247,13 @@ phpvm unalias production
 ```
 
 Aliases also appear in `phpvm list` output when defined.
+
+You can also use `latest` or `stable` as shorthand for the latest installed PHP version:
+
+```sh
+phpvm use latest
+phpvm use stable
+```
 
 ### Cache Directory
 

@@ -35,6 +35,10 @@ load test_helper
     [ "$status" -eq 0 ]
     [[ "$output" =~ "default" ]]
 
+    run PHPVM_DIR="$temp_dir/.phpvm" bash "$BATS_TEST_DIRNAME/../phpvm.sh" alias def
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "default" ]]
+
     rm -rf "$temp_dir"
 }
 
@@ -48,6 +52,33 @@ load test_helper
     run PHPVM_DIR="$temp_dir/.phpvm" bash "$BATS_TEST_DIRNAME/../phpvm.sh" unalias test
     [ "$status" -eq 0 ]
     [ ! -f "$temp_dir/.phpvm/alias/test" ]
+
+    rm -rf "$temp_dir"
+}
+
+@test "phpvm auto resolves alias in .phpvmrc" {
+    local temp_dir
+    temp_dir=$(mktemp -d /tmp/phpvm-bats-rcalias.XXXXXX)
+
+    mkdir -p "$temp_dir/project"
+    echo "default" > "$temp_dir/project/.phpvmrc"
+
+    PHPVM_DIR="$temp_dir/.phpvm" bash "$BATS_TEST_DIRNAME/../phpvm.sh" alias default 8.1
+
+    run bash -c "cd $temp_dir/project && PHPVM_DIR=$temp_dir/.phpvm PHPVM_TEST_MODE=true bash $BATS_TEST_DIRNAME/../phpvm.sh auto"
+    [ "$status" -eq 0 ]
+
+    rm -rf "$temp_dir"
+}
+
+@test "phpvm use without args uses default alias" {
+    local temp_dir
+    temp_dir=$(mktemp -d /tmp/phpvm-bats-default.XXXXXX)
+
+    PHPVM_DIR="$temp_dir/.phpvm" bash "$BATS_TEST_DIRNAME/../phpvm.sh" alias default 8.1
+
+    run PHPVM_DIR="$temp_dir/.phpvm" PHPVM_TEST_MODE=true bash "$BATS_TEST_DIRNAME/../phpvm.sh" use
+    [ "$status" -eq 0 ]
 
     rm -rf "$temp_dir"
 }
