@@ -75,7 +75,7 @@ jobs:
 
       - name: Install BATS
         run: |
-          if [ "${{ matrix.os }}" = "macos-latest" ]; then
+          if [ "${{ runner.os }}" = "macOS" ]; then
             brew install bats-core
           else
             sudo apt-get update
@@ -113,10 +113,11 @@ jobs:
         run: |
           export PHPVM_DIR="$HOME/.phpvm-test"
           mkdir -p "$PHPVM_DIR"
+          chmod +x install.sh
           ./install.sh
 
       - name: Test PHP Installation (macOS)
-        if: matrix.os == 'macos-latest'
+        if: runner.os == 'macOS'
         run: |
           source "$HOME/.phpvm-test/phpvm.sh"
 
@@ -133,7 +134,7 @@ jobs:
           phpvm current
 
       - name: Test PHP Installation (Ubuntu)
-        if: matrix.os == 'ubuntu-latest'
+        if: runner.os == 'Linux'
         run: |
           source "$HOME/.phpvm-test/phpvm.sh"
 
