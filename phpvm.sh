@@ -138,6 +138,14 @@ create_directories() {
         phpvm_err "Failed to create directory $PHPVM_VERSIONS_DIR"
         return 1
     }
+
+    # Create alias directory for future alias support
+    # This directory will store version aliases (e.g., default -> 8.2)
+    mkdir -p "$PHPVM_DIR/alias" 2>/dev/null || true
+
+    # Create cache directory for future caching support
+    # This will store metadata and potentially downloaded packages
+    mkdir -p "$PHPVM_DIR/cache" 2>/dev/null || true
 }
 
 # Get OS information
@@ -377,6 +385,32 @@ validate_php_version() {
     return $PHPVM_EXIT_INVALID_ARG
 }
 
+# Resolve version alias to actual version number
+# Returns the resolved version or the input if no alias is found
+phpvm_resolve_version() {
+    local input="$1"
+    local resolved=""
+
+    # Return early for empty input
+    if [ -z "$input" ]; then
+        return 1
+    fi
+
+    # Check alias file first
+    if [ -f "$PHPVM_DIR/alias/$input" ]; then
+        resolved=$(command cat "$PHPVM_DIR/alias/$input" 2>/dev/null | command tr -d '[:space:]')
+        if [ -n "$resolved" ]; then
+            phpvm_debug "Resolved alias '$input' to version '$resolved'"
+            echo "$resolved"
+            return 0
+        fi
+    fi
+
+    # No alias found, return input as-is
+    echo "$input"
+    return 0
+}
+
 # Check if Remi repository is available/enabled for RHEL/Fedora systems
 check_remi_repository() {
     # Check if Remi repository is installed
@@ -491,6 +525,9 @@ install_php() {
         phpvm_err "No PHP version specified for installation."
         return 1
     }
+
+    # Resolve aliases to actual versions
+    version=$(phpvm_resolve_version "$version")
 
     # Validate version format
     if ! validate_php_version "$version"; then
@@ -770,6 +807,9 @@ use_php_version() {
         phpvm_err "No PHP version specified to switch."
         return $PHPVM_EXIT_INVALID_ARG
     }
+
+    # Resolve aliases to actual versions
+    version=$(phpvm_resolve_version "$version")
 
     # Validate version format
     if ! validate_php_version "$version"; then
@@ -1082,6 +1122,9 @@ phpvm_which() {
         version=$(phpvm_current)
     fi
 
+    # Resolve aliases to actual versions
+    version=$(phpvm_resolve_version "$version")
+
     # Handle special cases
     case "$version" in
         none)
@@ -1312,6 +1355,42 @@ auto_switch_php_version() {
     return 0
 }
 
+# List configured aliases
+# Usage: phpvm_list_aliases [pattern]
+phpvm_list_aliases() {
+    local pattern="${1:-}"
+    local alias_file
+    local alias_name
+    local alias_target
+    local matched=false
+
+    if [ ! -d "$PHPVM_DIR/alias" ]; then
+        return 1
+    fi
+
+    for alias_file in "$PHPVM_DIR/alias"/*; do
+        if [ -f "$alias_file" ]; then
+            alias_name=$(basename "$alias_file")
+            alias_target=$(command cat "$alias_file" 2>/dev/null | command tr -d '[:space:]')
+            if [ -n "$pattern" ]; then
+                if echo "$alias_name" | command grep -qi "$pattern"; then
+                    echo "  $alias_name -> $alias_target"
+                    matched=true
+                fi
+            else
+                echo "  $alias_name -> $alias_target"
+                matched=true
+            fi
+        fi
+    done
+
+    if [ "$matched" = "true" ]; then
+        return 0
+    fi
+
+    return 1
+}
+
 # List installed PHP versions
 list_installed_versions() {
     local dir
@@ -1386,6 +1465,12 @@ list_installed_versions() {
     else
         phpvm_warn "No active PHP version set."
     fi
+
+    if phpvm_list_aliases >/dev/null 2>&1; then
+        echo ""
+        phpvm_echo "Aliases:"
+        phpvm_list_aliases || true
+    fi
 }
 
 # Print help message
@@ -1403,6 +1488,8 @@ Usage:
   phpvm system              Switch to system PHP version
   phpvm auto                Auto-switch based on .phpvmrc file
   phpvm list                List installed PHP versions
+    phpvm alias [name] [ver]  Create, update, or list version aliases
+    phpvm unalias <name>      Remove version alias
   phpvm help                Show this help message
   phpvm test                Run self-tests to verify functionality
   phpvm info                Show system information for debugging
@@ -1417,6 +1504,12 @@ Examples:
   phpvm deactivate          Disable phpvm, restore original PATH
   phpvm system              Switch to system PHP version
   phpvm auto                Auto-switch based on current directory
+
+Planned Features (Coming Soon):
+  phpvm exec <ver> <cmd>    Execute command with specific PHP version (Phase 1)
+  phpvm run <ver> [script]  Run PHP script with specific version (Phase 1)
+  phpvm ls-remote [pattern] List available remote PHP versions (Phase 2)
+  phpvm cache <dir|clear>   Manage cache directory (Phase 1)
 
 Exit Codes:
   0   Success
@@ -1893,6 +1986,33 @@ EOF
         return 0
     }
 
+    # Test alias management
+    test_phpvm_alias() {
+        local alias_file="$PHPVM_DIR/alias/test-alias"
+
+        # Create alias
+        phpvm_alias "test-alias" "8.1" >/dev/null 2>&1 || return 1
+        [ -f "$alias_file" ] || return 1
+
+        # Resolve alias
+        if [ "$(phpvm_resolve_version test-alias)" != "8.1" ]; then
+            echo "Alias did not resolve correctly"
+            return 1
+        fi
+
+        # Show alias
+        if ! phpvm_alias "test-alias" | grep -q "test-alias"; then
+            echo "Alias display failed"
+            return 1
+        fi
+
+        # Remove alias
+        phpvm_unalias "test-alias" >/dev/null 2>&1 || return 1
+        [ ! -f "$alias_file" ] || return 1
+
+        return 0
+    }
+
     # Test phpvm_deactivate function
     test_phpvm_deactivate() {
         # Setup: Simulate an active phpvm state
@@ -1995,6 +2115,9 @@ EOF
 
     total=$((total + 1))
     test_function "phpvm_which" test_phpvm_which || failed=$((failed + 1))
+
+    total=$((total + 1))
+    test_function "phpvm_alias" test_phpvm_alias || failed=$((failed + 1))
 
     total=$((total + 1))
     test_function "phpvm_deactivate" test_phpvm_deactivate || failed=$((failed + 1))
@@ -2132,6 +2255,146 @@ uninstall_php() {
     return 0
 }
 
+# ============================================================================
+# FEATURE PLACEHOLDERS - To be implemented in future versions
+# These functions are stubs for planned features from the NVM feature gap analysis
+# See NVM_FEATURE_GAPS.md for detailed implementation guidance
+# ============================================================================
+
+# Placeholder: Execute command with specific PHP version (HIGH PRIORITY - Phase 1)
+# Usage: phpvm_exec <version> <command> [args...]
+# Example: phpvm exec 8.2 composer install
+phpvm_exec() {
+    phpvm_err "The 'exec' command is not yet implemented."
+    phpvm_warn "This feature is planned for Phase 1 of the NVM parity roadmap."
+    phpvm_warn "Usage: phpvm exec <version> <command> [args...]"
+    return $PHPVM_EXIT_ERROR
+}
+
+# Placeholder: Run PHP script with specific version (HIGH PRIORITY - Phase 1)
+# Usage: phpvm_run <version> [script] [args...]
+# Example: phpvm run 8.1 script.php arg1 arg2
+phpvm_run() {
+    phpvm_err "The 'run' command is not yet implemented."
+    phpvm_warn "This feature is planned for Phase 1 of the NVM parity roadmap."
+    phpvm_warn "Usage: phpvm run <version> [script] [args...]"
+    return $PHPVM_EXIT_ERROR
+}
+
+# Placeholder: List available remote PHP versions (HIGH PRIORITY - Phase 2)
+# Usage: phpvm_ls_remote [pattern]
+# Example: phpvm ls-remote 8.2
+phpvm_ls_remote() {
+    phpvm_err "The 'ls-remote' command is not yet implemented."
+    phpvm_warn "This feature is planned for Phase 2 of the NVM parity roadmap."
+    phpvm_warn "Usage: phpvm ls-remote [pattern]"
+    return $PHPVM_EXIT_ERROR
+}
+
+# Placeholder: Manage version aliases (HIGH PRIORITY - Phase 1)
+# Usage: phpvm_alias [name] [version]
+# Example: phpvm alias default 8.2
+phpvm_alias() {
+    local name="$1"
+    local version="$2"
+
+    # List aliases (optionally filtered by pattern)
+    if [ -z "$name" ]; then
+        phpvm_echo "Version aliases:"
+        if phpvm_list_aliases; then
+            return 0
+        fi
+        echo "  (no aliases defined)"
+        return 0
+    fi
+
+    # Show single alias
+    if [ -z "$version" ]; then
+        if [ -f "$PHPVM_DIR/alias/$name" ]; then
+            local alias_target
+            alias_target=$(command cat "$PHPVM_DIR/alias/$name" 2>/dev/null | command tr -d '[:space:]')
+            echo "$name -> $alias_target"
+            return 0
+        fi
+        phpvm_err "Alias '$name' not found."
+        return $PHPVM_EXIT_NOT_FOUND
+    fi
+
+    # Validate alias name
+    if ! echo "$name" | command grep -qE '^[a-zA-Z0-9_-]+$'; then
+        phpvm_err "Invalid alias name: $name (use only letters, numbers, hyphens, and underscores)"
+        return $PHPVM_EXIT_INVALID_ARG
+    fi
+
+    # Resolve version and validate
+    version=$(phpvm_resolve_version "$version")
+    if ! validate_php_version "$version"; then
+        phpvm_err "Invalid PHP version format: $version"
+        return $PHPVM_EXIT_INVALID_ARG
+    fi
+
+    if phpvm_atomic_write "$PHPVM_DIR/alias/$name" "$version"; then
+        phpvm_echo "Alias '$name' set to PHP $version"
+        return 0
+    fi
+
+    phpvm_err "Failed to create alias '$name'"
+    return $PHPVM_EXIT_FILE_ERROR
+}
+
+# Placeholder: Remove version alias (HIGH PRIORITY - Phase 1)
+# Usage: phpvm_unalias <name>
+# Example: phpvm unalias default
+phpvm_unalias() {
+    local name="$1"
+
+    if [ -z "$name" ]; then
+        phpvm_err "Missing alias name."
+        phpvm_warn "Usage: phpvm unalias <name>"
+        return $PHPVM_EXIT_INVALID_ARG
+    fi
+
+    if [ ! -f "$PHPVM_DIR/alias/$name" ]; then
+        phpvm_err "Alias '$name' not found."
+        return $PHPVM_EXIT_NOT_FOUND
+    fi
+
+    if rm -f "$PHPVM_DIR/alias/$name" 2>/dev/null; then
+        phpvm_echo "Alias '$name' removed."
+        return 0
+    fi
+
+    phpvm_err "Failed to remove alias '$name'"
+    return $PHPVM_EXIT_FILE_ERROR
+}
+
+# Placeholder: Cache management (HIGH PRIORITY - Phase 1)
+# Usage: phpvm_cache <dir|clear>
+# Example: phpvm cache clear
+phpvm_cache() {
+    local subcmd="${1:-}"
+    case "$subcmd" in
+        dir)
+            echo "$PHPVM_DIR/cache"
+            return 0
+            ;;
+        clear)
+            phpvm_err "The 'cache clear' command is not yet implemented."
+            phpvm_warn "This feature is planned for Phase 1 of the NVM parity roadmap."
+            return $PHPVM_EXIT_ERROR
+            ;;
+        *)
+            phpvm_err "Unknown cache subcommand: $subcmd"
+            phpvm_warn "Usage: phpvm cache <dir|clear>"
+            return $PHPVM_EXIT_INVALID_ARG
+            ;;
+    esac
+}
+
+# ============================================================================
+# END FEATURE PLACEHOLDERS
+# ============================================================================
+
 # Main function to handle commands
 main() {
     local command
@@ -2200,6 +2463,24 @@ main() {
         ;;
     info | sysinfo)
         print_system_info
+        ;;
+    exec)
+        phpvm_exec "$@"
+        ;;
+    run)
+        phpvm_run "$@"
+        ;;
+    ls-remote)
+        phpvm_ls_remote "$@"
+        ;;
+    alias)
+        phpvm_alias "$@"
+        ;;
+    unalias)
+        phpvm_unalias "$@"
+        ;;
+    cache)
+        phpvm_cache "$@"
         ;;
     *)
         phpvm_err "Unknown command: $command"

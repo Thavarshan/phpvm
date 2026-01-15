@@ -1,0 +1,34 @@
+# ShellCheck configuration for phpvm
+# See https://github.com/koalaman/shellcheck/wiki
+
+# Disable specific checks that are intentional or not applicable
+
+# SC2155: Declare and assign separately to avoid masking return values
+# We use this pattern intentionally for readability in some cases
+disable=SC2155
+
+# SC1091: Not following: file not included in repository
+# We source files that may not exist yet
+disable=SC1091
+
+# SC2317: Command appears to be unreachable (in functions)
+# False positives with our function structure
+disable=SC2317
+
+# SC2034: Variable appears unused
+# Some variables are used in eval or sourced contexts
+disable=SC2034
+
+# Enable optional checks
+enable=quote-safe-variables
+enable=require-variable-braces
+enable=check-unassigned-uppercase
+
+# Set shell to bash
+shell=bash
+
+# External sources that we know about
+source-path=SCRIPTDIR
+
+# Exclude patterns
+exclude=SC1090,SC1091
