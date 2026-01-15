@@ -47,7 +47,7 @@ sudo apt-get update
 sudo apt-get install -y shellcheck bats
 
 # shfmt (manual installation)
-wget -O shfmt https://github.com/mvdan/sh/releases/latest/download/shfmt_v3.8.0_linux_amd64
+wget -O shfmt https://github.com/mvdan/sh/releases/download/v3.12.0/shfmt_v3.12.0_linux_amd64
 chmod +x shfmt
 sudo mv shfmt /usr/local/bin/
 ```
