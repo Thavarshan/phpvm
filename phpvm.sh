@@ -12,7 +12,9 @@ PHPVM_VERSION="1.7.0"
 PHPVM_TEST_MODE="${PHPVM_TEST_MODE:-false}"
 
 # Fix to prevent shell crash when sourced
-(return 0 2>/dev/null) && return 0 || true # Allow sourcing without execution
+if (return 0 2>/dev/null); then
+    return 0
+fi
 
 PHPVM_DIR="${PHPVM_DIR:-$HOME/.phpvm}"
 PHPVM_VERSIONS_DIR="$PHPVM_DIR/versions"
@@ -1961,8 +1963,8 @@ EOF
         mkdir -p "$HOME/project"
         echo "7.4" >"$HOME/project/.phpvmrc"
 
-        # Change to the project directory
-        cd "$HOME/project"
+    # Change to the project directory
+    cd "$HOME/project" || return 1
 
         # Test auto-switching
         auto_switch_php_version >/dev/null
@@ -1984,8 +1986,8 @@ EOF
         mkdir -p "$HOME/alias_project"
         echo "default" >"$HOME/alias_project/.phpvmrc"
 
-        # Change to the project directory
-        cd "$HOME/alias_project"
+    # Change to the project directory
+    cd "$HOME/alias_project" || return 1
 
         # Test auto-switching
         auto_switch_php_version >/dev/null
@@ -2001,8 +2003,8 @@ EOF
         mkdir -p "$HOME/bad_project"
         touch "$HOME/bad_project/.phpvmrc"
 
-        # Change to the project directory
-        cd "$HOME/bad_project"
+    # Change to the project directory
+    cd "$HOME/bad_project" || return 1
 
         # Test auto-switching with empty .phpvmrc
         output=$(auto_switch_php_version 2>&1)
@@ -2666,7 +2668,8 @@ else
 
     # Auto-use .phpvmrc if enabled and present
     if [ "${PHPVM_AUTO_USE:-true}" = "true" ] && [ -f ".phpvmrc" ]; then
-        command -v auto_switch_php_version >/dev/null 2>&1 &&
+        if command -v auto_switch_php_version >/dev/null 2>&1; then
             auto_switch_php_version 2>/dev/null || true
+        fi
     fi
 fi

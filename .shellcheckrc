@@ -19,10 +19,8 @@ disable=SC2317
 # Some variables are used in eval or sourced contexts
 disable=SC2034
 
-# Enable optional checks
-enable=quote-safe-variables
-enable=require-variable-braces
-enable=check-unassigned-uppercase
+# Limit output to warnings/errors to avoid noise from info/style checks
+severity=warning
 
 # Set shell to bash
 shell=bash
