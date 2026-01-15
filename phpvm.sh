@@ -2003,7 +2003,7 @@ main() {
         phpvm_which "$@"
         ;;
     deactivate)
-        phpvm_deactivate
+        phpvm_deactivate false
         ;;
     system)
         system_php_version
