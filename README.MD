@@ -52,7 +52,7 @@ PHP 8.1.13
 - Post-install validation with helpful warnings for missing binaries.
 - Enhanced Homebrew integration with better link failure detection.
 - Informative, color-coded feedback with timestamps for logs.
-- Built-in self-tests for verifying functionality (`phpvm test`).
+- Comprehensive BATS test suite for verifying functionality.
 - Helper functions for better maintainability and reduced code duplication.
 
 ## Installation
@@ -104,7 +104,6 @@ If the installation was successful, it should output the path to `phpvm`.
 | `phpvm unalias <name>`     | Remove version alias                       |
 | `phpvm cache dir`          | Show phpvm cache directory                 |
 | `phpvm auto`               | Auto-switch based on `.phpvmrc` file       |
-| `phpvm test`               | Run built-in self-tests                    |
 | `phpvm version`            | Show version information                   |
 | `phpvm --version`          | Show version information (alias)           |
 | `phpvm -v`                 | Show version information (alias)           |
@@ -272,16 +271,6 @@ The following commands are in progress and may return a "not yet implemented" me
 - `phpvm ls-remote [pattern]`
 - `phpvm cache clear`
 
-### Running Self-Tests
-
-phpvm includes built-in self-tests to verify everything is working correctly:
-
-```sh
-phpvm test
-```
-
-This will run a series of tests on your system to ensure all phpvm functions are working properly.
-
 ### Exit Codes
 
 phpvm uses specific exit codes for better scripting support:
@@ -391,23 +380,26 @@ phpvm install 8.3
 
 ## Development & Testing
 
-phpvm features comprehensive testing across multiple platforms and scenarios. The project includes extensive GitHub Actions workflows that test every aspect of the script.
+phpvm features comprehensive testing using the BATS (Bash Automated Testing System) framework. The project includes extensive GitHub Actions workflows that test every aspect of the script.
 
-### Built-in Testing
+### Running Tests
 
-phpvm includes built-in self-tests that validate all core functionality:
+Run the BATS test suite to validate all functionality:
 
 ```sh
-# Run the built-in tests
-phpvm test
+# Run all tests
+make test-bats
 
-# Get detailed system information for debugging
-phpvm info
+# Or run BATS directly
+bats tests/
+
+# Run specific test file
+bats tests/01_core.bats
 ```
 
-The built-in test framework verifies:
+The BATS test suite verifies:
 
-- Output and formatting functions
+- Core functionality (version management, installation, switching)
 - System detection and OS compatibility
 - PHP version installation (mocked)
 - Version switching and validation

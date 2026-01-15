@@ -8,13 +8,8 @@
 
 PHPVM_VERSION="1.7.0"
 
-# Test mode flag (set by run_tests function)
+# Test mode flag
 PHPVM_TEST_MODE="${PHPVM_TEST_MODE:-false}"
-
-# Fix to prevent shell crash when sourced
-if (return 0 2> /dev/null); then
-    return 0
-fi
 
 PHPVM_DIR="${PHPVM_DIR:-$HOME/.phpvm}"
 PHPVM_VERSIONS_DIR="$PHPVM_DIR/versions"
@@ -457,7 +452,7 @@ phpvm_get_latest_installed_version() {
         apt)
             while read -r version; do
                 versions+=("$version")
-            done < <(dpkg-query -W -f='${Package}\n' 2> /dev/null | grep -E '^php[0-9]+\.[0-9]+' | sed 's/^php//')
+            done < <(dpkg-query -W -f='${Package}\n' 2> /dev/null | grep -E '^php[0-9]+\.[0-9]+' | sed -E 's/^php([0-9]+\.[0-9]+).*/\1/' | sort -u)
             ;;
         dnf | yum)
             while read -r version; do
@@ -1565,10 +1560,9 @@ Usage:
   phpvm system              Switch to system PHP version
   phpvm auto                Auto-switch based on .phpvmrc file
   phpvm list                List installed PHP versions
-    phpvm alias [name] [ver]  Create, update, or list version aliases
-    phpvm unalias <name>      Remove version alias
+  phpvm alias [name] [ver]  Create, update, or list version aliases
+  phpvm unalias <name>      Remove version alias
   phpvm help                Show this help message
-  phpvm test                Run self-tests to verify functionality
   phpvm info                Show system information for debugging
   phpvm version             Show version information
 
@@ -1689,582 +1683,6 @@ print_system_info() {
     echo "DEBUG: ${DEBUG:-false}"
     echo "PHPVM_TEST_MODE: ${PHPVM_TEST_MODE:-false}"
     echo "PHPVM_AUTO_USE: ${PHPVM_AUTO_USE:-true}"
-}
-
-# Self-tests for phpvm functionality
-run_tests() {
-    # Set up test environment
-    echo "${GREEN}Setting up test environment...${RESET}"
-
-    # Create a temporary directory for tests
-    TEST_DIR=$(mktemp -d)
-
-    # Set test-specific environment variables
-    export PHPVM_TEST_MODE=true
-    export HOME="$TEST_DIR"
-    export PHPVM_DIR="$HOME/.phpvm"
-    export PHPVM_VERSIONS_DIR="$PHPVM_DIR/versions"
-    export PHPVM_ACTIVE_VERSION_FILE="$PHPVM_DIR/active_version"
-    export PHPVM_CURRENT_SYMLINK="$PHPVM_DIR/current"
-    export TEST_PREFIX="$TEST_DIR"
-
-    # Create mock commands for testing
-    MOCK_BIN_DIR="$TEST_DIR/bin"
-    mkdir -p "$MOCK_BIN_DIR"
-    PATH="$MOCK_BIN_DIR:$PATH"
-
-    # Mock brew command
-    cat > "$MOCK_BIN_DIR/brew" << 'EOF'
-#!/bin/sh
-if [ "$1" = "--prefix" ]; then
-    echo "/opt/homebrew"
-    exit 0
-fi
-
-if [ "$1" = "install" ]; then
-    mkdir -p "$TEST_PREFIX/opt/homebrew/Cellar/php"
-    mkdir -p "$TEST_PREFIX/opt/homebrew/Cellar/php@$2"
-    echo "Installed PHP $2"
-    exit 0
-elif [ "$1" = "unlink" ]; then
-    echo "Unlinked PHP"
-    exit 0
-elif [ "$1" = "link" ]; then
-    echo "Linked PHP"
-    exit 0
-fi
-exit 0
-EOF
-    chmod +x "$MOCK_BIN_DIR/brew"
-
-    # Mock uname command
-    cat > "$MOCK_BIN_DIR/uname" << 'EOF'
-#!/bin/sh
-echo "Darwin"
-exit 0
-EOF
-    chmod +x "$MOCK_BIN_DIR/uname"
-
-    # Mock php and php-config commands
-    cat > "$MOCK_BIN_DIR/php" << 'EOF'
-#!/bin/sh
-if [ "$1" = "-v" ]; then
-    echo "PHP 8.0.0 (cli)"
-fi
-exit 0
-EOF
-    chmod +x "$MOCK_BIN_DIR/php"
-
-    cat > "$MOCK_BIN_DIR/php-config" << 'EOF'
-#!/bin/sh
-if [ "$1" = "--version" ]; then
-    echo "8.0.0"
-fi
-exit 0
-EOF
-    chmod +x "$MOCK_BIN_DIR/php-config"
-
-    # Mock sudo command
-    cat > "$MOCK_BIN_DIR/sudo" << 'EOF'
-#!/bin/sh
-# Just execute the command without actual sudo
-"$@"
-exit $?
-EOF
-    chmod +x "$MOCK_BIN_DIR/sudo"
-
-    # Mock id command
-    cat > "$MOCK_BIN_DIR/id" << 'EOF'
-#!/bin/sh
-if [ "$1" = "-u" ]; then
-    echo "1000"  # Non-root user
-fi
-exit 0
-EOF
-    chmod +x "$MOCK_BIN_DIR/id"
-
-    # Create test directories
-    mkdir -p "$PHPVM_DIR"
-    mkdir -p "$TEST_DIR/opt/homebrew/Cellar/php@7.4/bin"
-
-    test_function() {
-        local name="$1"
-        local status=0
-
-        shift
-        echo -n "${GREEN}Testing $name... ${RESET}"
-
-        if "$@"; then
-            echo "${GREEN}✓ PASSED${RESET}"
-            return 0
-        else
-            echo "${RED}✗ FAILED${RESET}"
-            return 1
-        fi
-    }
-
-    # Check the results of a function
-    assert_success() {
-        "$@"
-        local status=$?
-        return $status
-    }
-
-    # Check output contains expected text
-    assert_output_contains() {
-        local expected="$1"
-        shift
-
-        # Create a temporary file to capture both stdout and stderr
-        output_file=$(mktemp)
-
-        # Run the command, redirecting both stdout and stderr to the temporary file
-        "$@" > "$output_file" 2>&1
-
-        # Check if the output contains the expected text
-        if grep -q "$expected" "$output_file"; then
-            rm "$output_file"
-            return 0
-        else
-            echo "   Expected output to contain: $expected"
-            echo "   Actual output: $(cat "$output_file")"
-            rm "$output_file"
-            return 1
-        fi
-    }
-
-    # Check that a command creates a directory
-    assert_dir_exists() {
-        local dir="$1"
-        shift
-
-        "$@" > /dev/null 2>&1
-        if [ -d "$dir" ]; then
-            return 0
-        else
-            echo "   Directory $dir does not exist"
-            return 1
-        fi
-    }
-
-    # Test create_directories function
-    test_create_directories() {
-        rm -rf "$PHPVM_DIR"
-        assert_dir_exists "$PHPVM_VERSIONS_DIR" create_directories
-    }
-
-    # Test output functions with timestamps
-    test_output_functions() {
-        # Check that output contains timestamp format [YYYY-MM-DD HH:MM:SS]
-        assert_output_contains "[INFO]" phpvm_echo "Test message" &&
-            assert_output_contains "[ERROR]" phpvm_err "Test error" &&
-            assert_output_contains "[WARNING]" phpvm_warn "Test warning"
-    }
-
-    # Test timestamp format in logs
-    test_timestamp_format() {
-        # Extract just the timestamp portion from the output
-        output=$(phpvm_echo "Test message")
-        timestamp=$(echo "$output" | grep -o '[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\} [0-9]\{2\}:[0-9]\{2\}:[0-9]\{2\}')
-
-        # Check that it's a valid timestamp format
-        if [ -n "$timestamp" ]; then
-            return 0
-        else
-            echo "   Expected output to contain timestamp in YYYY-MM-DD HH:MM:SS format"
-            echo "   Actual output: $output"
-            return 1
-        fi
-    }
-
-    # Test the run_with_sudo function
-    test_run_with_sudo() {
-        # Create a test command that outputs its arguments
-        cat > "$MOCK_BIN_DIR/testcmd" << 'EOF'
-#!/bin/sh
-echo "Command executed with args: $@"
-exit 0
-EOF
-        chmod +x "$MOCK_BIN_DIR/testcmd"
-
-        # Run the command through run_with_sudo
-        output=$(run_with_sudo testcmd arg1 arg2)
-
-        # Check that the command was executed with the correct arguments
-        if echo "$output" | grep -q "Command executed with args: arg1 arg2"; then
-            return 0
-        else
-            echo "   Expected command to be executed with args"
-            echo "   Actual output: $output"
-            return 1
-        fi
-    }
-
-    # Test detect_system function
-    test_detect_system() {
-        detect_system
-        [ "$PKG_MANAGER" = "brew" ] && [ -n "$PHP_BIN_PATH" ]
-    }
-
-    # Test get_installed_php_version
-    test_get_installed_php_version() {
-        result=$(get_installed_php_version)
-        [ "$result" = "8.0.0" ]
-    }
-
-    # Test install_php
-    test_install_php() {
-        install_php "7.4" > /dev/null
-        local status=$?
-
-        # Check for success and file existence
-        [ $status -eq 0 ] && [ -d "$TEST_DIR/opt/homebrew/Cellar/php@7.4/bin" ]
-    }
-
-    # Test use_php_version
-    test_use_php_version() {
-        # Create mock installation
-        mkdir -p "$TEST_DIR/opt/homebrew/Cellar/php@7.4/bin"
-
-        # Test switching
-        use_php_version "7.4" > /dev/null
-        local status=$?
-
-        # Check for success and correct active version
-        [ $status -eq 0 ] && [ "$(cat "$PHPVM_ACTIVE_VERSION_FILE")" = "7.4" ]
-    }
-
-    # Test use default alias
-    test_use_default_alias() {
-        mkdir -p "$TEST_DIR/opt/homebrew/Cellar/php@8.2/bin"
-        phpvm_alias "default" "8.2" > /dev/null 2>&1 || return 1
-
-        use_php_version "default" > /dev/null
-        local status=$?
-
-        [ $status -eq 0 ] && [ "$(cat "$PHPVM_ACTIVE_VERSION_FILE")" = "8.2" ]
-    }
-
-    # Test system_php_version
-    test_system_php_version() {
-        system_php_version > /dev/null
-        local status=$?
-
-        # Check for success and correct active version
-        [ $status -eq 0 ] && [ "$(cat "$PHPVM_ACTIVE_VERSION_FILE")" = "system" ]
-    }
-
-    # Test auto_switch_php_version
-    test_auto_switch() {
-        # Create mock installation
-        mkdir -p "$TEST_DIR/opt/homebrew/Cellar/php@7.4/bin"
-
-        # Create a project with .phpvmrc
-        mkdir -p "$HOME/project"
-        echo "7.4" > "$HOME/project/.phpvmrc"
-
-        # Change to the project directory
-        cd "$HOME/project" || return 1
-
-        # Test auto-switching
-        auto_switch_php_version > /dev/null
-        local status=$?
-
-        # Check for success and correct active version
-        [ $status -eq 0 ] && [ "$(cat "$PHPVM_ACTIVE_VERSION_FILE")" = "7.4" ]
-    }
-
-    # Test auto_switch_php_version with alias
-    test_auto_switch_alias() {
-        # Create mock installation
-        mkdir -p "$TEST_DIR/opt/homebrew/Cellar/php@8.1/bin"
-
-        # Create alias
-        phpvm_alias "default" "8.1" > /dev/null 2>&1 || return 1
-
-        # Create a project with .phpvmrc
-        mkdir -p "$HOME/alias_project"
-        echo "default" > "$HOME/alias_project/.phpvmrc"
-
-        # Change to the project directory
-        cd "$HOME/alias_project" || return 1
-
-        # Test auto-switching
-        auto_switch_php_version > /dev/null
-        local status=$?
-
-        # Check for success and correct active version
-        [ $status -eq 0 ] && [ "$(cat "$PHPVM_ACTIVE_VERSION_FILE")" = "8.1" ]
-    }
-
-    # Test handling of corrupted .phpvmrc file
-    test_corrupted_phpvmrc() {
-        # Create an invalid .phpvmrc file (empty)
-        mkdir -p "$HOME/bad_project"
-        touch "$HOME/bad_project/.phpvmrc"
-
-        # Change to the project directory
-        cd "$HOME/bad_project" || return 1
-
-        # Test auto-switching with empty .phpvmrc
-        output=$(auto_switch_php_version 2>&1)
-        status=$?
-
-        # Should fail with an appropriate warning
-        [ $status -eq 1 ] && echo "$output" | grep -q "No valid PHP version found"
-    }
-
-    # Test phpvm_current function
-    test_phpvm_current() {
-        # Test 1: With active version file set
-        echo "8.2" > "$PHPVM_ACTIVE_VERSION_FILE"
-        local result
-        result=$(phpvm_current)
-        if [ "$result" != "8.2" ]; then
-            echo "Expected '8.2', got '$result'"
-            return 1
-        fi
-
-        # Test 2: With different version
-        echo "7.4" > "$PHPVM_ACTIVE_VERSION_FILE"
-        result=$(phpvm_current)
-        if [ "$result" != "7.4" ]; then
-            echo "Expected '7.4', got '$result'"
-            return 1
-        fi
-
-        # Test 3: With system version
-        echo "system" > "$PHPVM_ACTIVE_VERSION_FILE"
-        result=$(phpvm_current)
-        if [ "$result" != "system" ]; then
-            echo "Expected 'system', got '$result'"
-            return 1
-        fi
-
-        # Test 4: With no active version file (should return "none" or fallback)
-        rm -f "$PHPVM_ACTIVE_VERSION_FILE"
-        result=$(phpvm_current)
-        # In test mode with mock php, it should return something (not empty)
-        if [ -z "$result" ]; then
-            echo "Expected non-empty result, got empty"
-            return 1
-        fi
-
-        return 0
-    }
-
-    # Test phpvm_which function
-    test_phpvm_which() {
-        # Create mock PHP installation directory
-        local mock_php_dir="${TEST_PREFIX}/opt/homebrew/Cellar/php@8.1/bin"
-        mkdir -p "$mock_php_dir"
-
-        # Test 1: With active version set, no argument
-        echo "8.1" > "$PHPVM_ACTIVE_VERSION_FILE"
-        local result
-        result=$(phpvm_which 2> /dev/null)
-        # Should return a path (mock path in test mode)
-        if [ -z "$result" ]; then
-            echo "Test 1 failed: Expected non-empty path for current version"
-            return 1
-        fi
-
-        # Test 2: With specific version argument
-        result=$(phpvm_which "8.1" 2> /dev/null)
-        if [ -z "$result" ]; then
-            echo "Test 2 failed: Expected non-empty path for version 8.1"
-            return 1
-        fi
-
-        # Test 3: With system version
-        echo "system" > "$PHPVM_ACTIVE_VERSION_FILE"
-        result=$(phpvm_which 2>&1)
-        # Should either return a path or an error message
-        if [ -z "$result" ]; then
-            echo "Test 3 failed: Expected output for system version"
-            return 1
-        fi
-
-        # Test 4: With 'none' active version (should fail)
-        rm -f "$PHPVM_ACTIVE_VERSION_FILE"
-        # Mock phpvm_current to return "none"
-        echo "none" > "$PHPVM_ACTIVE_VERSION_FILE"
-        result=$(phpvm_which 2>&1)
-        status=$?
-        # When version is "none", it should error
-        # (In practice it reads "none" from file, which isn't a valid version)
-
-        return 0
-    }
-
-    # Test alias management
-    test_phpvm_alias() {
-        local alias_file="$PHPVM_DIR/alias/test-alias"
-
-        # Create alias
-        phpvm_alias "test-alias" "8.1" > /dev/null 2>&1 || return 1
-        [ -f "$alias_file" ] || return 1
-
-        # Resolve alias
-        if [ "$(phpvm_resolve_version test-alias)" != "8.1" ]; then
-            echo "Alias did not resolve correctly"
-            return 1
-        fi
-
-        # Show alias
-        if ! phpvm_alias "test-alias" | grep -q "test-alias"; then
-            echo "Alias display failed"
-            return 1
-        fi
-
-        # Remove alias
-        phpvm_unalias "test-alias" > /dev/null 2>&1 || return 1
-        [ ! -f "$alias_file" ] || return 1
-
-        return 0
-    }
-
-    # Test phpvm_deactivate function
-    test_phpvm_deactivate() {
-        # Setup: Simulate an active phpvm state
-        echo "8.1" > "$PHPVM_ACTIVE_VERSION_FILE"
-        mkdir -p "$PHPVM_DIR"
-        ln -sf "/tmp/fake/php" "$PHPVM_CURRENT_SYMLINK" 2> /dev/null || true
-
-        # Store a fake original PATH
-        export PHPVM_ORIGINAL_PATH="/usr/bin:/bin"
-        local old_path="$PATH"
-        export PATH="/fake/phpvm/path:$PATH"
-
-        # Test 1: Deactivate should succeed (run directly, not in subshell)
-        phpvm_deactivate "true" # silent mode
-        local status=$?
-
-        if [ $status -ne 0 ]; then
-            echo "Test 1 failed: deactivate returned non-zero status"
-            export PATH="$old_path"
-            return 1
-        fi
-
-        # Test 2: Active version file should be removed
-        if [ -f "$PHPVM_ACTIVE_VERSION_FILE" ]; then
-            echo "Test 2 failed: active version file still exists"
-            export PATH="$old_path"
-            return 1
-        fi
-
-        # Test 3: PHPVM_ORIGINAL_PATH should be unset (can only check when not in subshell)
-        if [ -n "${PHPVM_ORIGINAL_PATH:-}" ]; then
-            echo "Test 3 failed: PHPVM_ORIGINAL_PATH should be unset"
-            export PATH="$old_path"
-            return 1
-        fi
-
-        # Test 4: Deactivating when already deactivated should be fine
-        local output
-        output=$(phpvm_deactivate 2>&1)
-        status=$?
-        if [ $status -ne 0 ]; then
-            echo "Test 4 failed: second deactivate should succeed"
-            export PATH="$old_path"
-            return 1
-        fi
-
-        # Test 5: Output should contain appropriate message
-        if ! echo "$output" | grep -qE "deactivated|not currently active"; then
-            echo "Test 5 failed: Expected deactivate message in output"
-            export PATH="$old_path"
-            return 1
-        fi
-
-        # Restore PATH for other tests
-        export PATH="$old_path"
-        return 0
-    }
-
-    # Run all tests
-    echo "${GREEN}Running phpvm self-tests...${RESET}"
-
-    failed=0
-    total=0
-
-    total=$((total + 1))
-    test_function "create_directories" test_create_directories || failed=$((failed + 1))
-
-    total=$((total + 1))
-    test_function "output functions" test_output_functions || failed=$((failed + 1))
-
-    total=$((total + 1))
-    test_function "timestamp format" test_timestamp_format || failed=$((failed + 1))
-
-    total=$((total + 1))
-    test_function "run_with_sudo" test_run_with_sudo || failed=$((failed + 1))
-
-    total=$((total + 1))
-    test_function "detect_system" test_detect_system || failed=$((failed + 1))
-
-    total=$((total + 1))
-    test_function "get_installed_php_version" test_get_installed_php_version || failed=$((failed + 1))
-
-    total=$((total + 1))
-    test_function "install_php" test_install_php || failed=$((failed + 1))
-
-    total=$((total + 1))
-    test_function "use_php_version" test_use_php_version || failed=$((failed + 1))
-
-    total=$((total + 1))
-    test_function "use default alias" test_use_default_alias || failed=$((failed + 1))
-
-    total=$((total + 1))
-    test_function "system_php_version" test_system_php_version || failed=$((failed + 1))
-
-    total=$((total + 1))
-    test_function "auto_switch_php_version" test_auto_switch || failed=$((failed + 1))
-
-    total=$((total + 1))
-    test_function "auto_switch_php_version alias" test_auto_switch_alias || failed=$((failed + 1))
-
-    total=$((total + 1))
-    test_function "corrupted .phpvmrc handling" test_corrupted_phpvmrc || failed=$((failed + 1))
-
-    total=$((total + 1))
-    test_function "phpvm_current" test_phpvm_current || failed=$((failed + 1))
-
-    total=$((total + 1))
-    test_function "phpvm_which" test_phpvm_which || failed=$((failed + 1))
-
-    total=$((total + 1))
-    test_function "phpvm_alias" test_phpvm_alias || failed=$((failed + 1))
-
-    total=$((total + 1))
-    test_function "phpvm_deactivate" test_phpvm_deactivate || failed=$((failed + 1))
-
-    # Clean up - ensure TEST_DIR is a valid temp directory before removal
-    # Safety checks: must be non-empty, must start with temp directory patterns, must not be a system directory
-    if [ -n "$TEST_DIR" ] &&
-        [ "$TEST_DIR" != "/" ] &&
-        [ "$TEST_DIR" != "$HOME" ] &&
-        [ "$TEST_DIR" != "/tmp" ] &&
-        [ "$TEST_DIR" != "/var" ] &&
-        [ "$TEST_DIR" != "/var/folders" ] &&
-        echo "$TEST_DIR" | command grep -qE '^(/tmp/|/var/folders/|/private/var/folders/)'; then
-        rm -rf "$TEST_DIR"
-    else
-        phpvm_debug "Skipping cleanup: TEST_DIR '$TEST_DIR' did not match expected temp patterns"
-    fi
-
-    # Print results
-    passed=$((total - failed))
-    echo ""
-    echo "${GREEN}Test Results: $passed/$total tests passed${RESET}"
-
-    if [ $failed -eq 0 ]; then
-        echo "${GREEN}All tests passed!${RESET}"
-        return 0
-    else
-        echo "${RED}$failed tests failed.${RESET}"
-        return 1
-    fi
 }
 
 # Uninstall a specific PHP version
@@ -2453,6 +1871,17 @@ phpvm_alias() {
         return "$PHPVM_EXIT_INVALID_ARG"
     fi
 
+    # Prevent alias chains and circular references
+    if [ "$name" = "$version" ]; then
+        phpvm_err "Alias '$name' cannot refer to itself. Please specify a PHP version."
+        return "$PHPVM_EXIT_INVALID_ARG"
+    fi
+
+    if [ -f "$PHPVM_DIR/alias/$version" ]; then
+        phpvm_err "Alias target '$version' is itself an alias. Please point aliases directly to a PHP version."
+        return "$PHPVM_EXIT_INVALID_ARG"
+    fi
+
     # Resolve version and validate
     version=$(phpvm_resolve_version "$version")
     if ! validate_php_version "$version"; then
@@ -2591,9 +2020,6 @@ main() {
     version | --version | -v)
         print_version
         ;;
-    test)
-        run_tests
-        ;;
     info | sysinfo)
         print_system_info
         ;;
@@ -2649,27 +2075,27 @@ phpvm_should_execute_main() {
 }
 
 # Safe main execution with error handling
-if phpvm_should_execute_main "$@"; then
-    phpvm_debug "Executing main with $# arguments"
-
-    # Verify main function exists
-    if command -v main > /dev/null 2>&1; then
-        main "$@"
-    else
-        phpvm_err "main function not found - script may be corrupted"
-        exit 1
-    fi
-else
-    phpvm_debug "Script sourced for function loading"
-
+# Check if script is being executed (not sourced)
+if [ "${BASH_SOURCE[0]}" != "${0}" ]; then
+    # Script sourced for function loading
     # Set environment for shell integration
     PHPVM_FUNCTIONS_LOADED=true
     export PHPVM_FUNCTIONS_LOADED
 
-    # Auto-use .phpvmrc if enabled and present
-    if [ "${PHPVM_AUTO_USE:-true}" = "true" ] && [ -f ".phpvmrc" ]; then
+    # Auto-use .phpvmrc if enabled and present (skip in test mode)
+    if [ "${PHPVM_TEST_MODE}" != "true" ] && [ "${PHPVM_AUTO_USE:-true}" = "true" ] && [ -f ".phpvmrc" ]; then
         if command -v auto_switch_php_version > /dev/null 2>&1; then
             auto_switch_php_version 2> /dev/null || true
         fi
+    fi
+else
+    # Script executed - run main
+    # Verify main function exists
+    if command -v main > /dev/null 2>&1; then
+        main "$@"
+        exit "$?"
+    else
+        phpvm_err "main function not found - script may be corrupted"
+        exit 1
     fi
 fi

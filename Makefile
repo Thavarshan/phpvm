@@ -28,8 +28,7 @@ help:
 	@echo "  make check          Run all checks (lint + format-check + test)"
 	@echo ""
 	@echo "$(GREEN)Testing:$(NC)"
-	@echo "  make test           Run built-in phpvm tests"
-	@echo "  make test-bats      Run BATS test suite"
+	@echo "  make test           Run BATS test suite"
 	@echo "  make test-all       Run all tests"
 	@echo "  make coverage       Run tests with coverage (if available)"
 	@echo ""
@@ -133,14 +132,8 @@ format-check:
 		echo "$(YELLOW)shfmt not found, skipping format check$(NC)"; \
 	fi
 
-## test: Run built-in phpvm tests
-test:
-	@echo "$(BLUE)Running phpvm built-in tests...$(NC)"
-	@bash phpvm.sh test || { \
-		echo "$(RED)Tests failed!$(NC)"; \
-		exit 1; \
-	}
-	@echo "$(GREEN)Built-in tests passed!$(NC)"
+## test: Run BATS test suite
+test: test-bats
 
 ## test-bats: Run BATS test suite
 test-bats:

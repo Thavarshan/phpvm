@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.8.0](https://github.com/Thavarshan/phpvm/compare/v1.7.0...v1.8.0) - 2026-01-12
+
 ### Added
 
 - **Alias management commands:** Added `phpvm alias` and `phpvm unalias` for version alias creation, listing, and removal.
@@ -18,10 +20,14 @@
 
 - **Help output:** Promoted alias commands to the primary usage section.
 
+### Removed
+
+- **Built-in test command:** Removed `phpvm test` command in favor of BATS test suite only.
+
 ### Internal
 
 - **Alias helper utilities:** Added alias listing helper and alias resolution logic.
-- **Test coverage:** Extended built-in test suite to cover alias functionality.
+- **Test coverage:** Extended BATS test suite to cover alias functionality and all core features.
 
 ## [v1.7.0](https://github.com/Thavarshan/phpvm/compare/v1.6.0...v1.7.0) - 2025-12-10
 
