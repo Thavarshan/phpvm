@@ -1,7 +1,6 @@
 [![PHP Version Manager (phpvm)](./assets/Banner.png)](https://github.com/Thavarshan/phpvm)
 
-[![Test](https://github.com/Thavarshan/phpvm/actions/workflows/test.yml/badge.svg)](https://github.com/Thavarshan/phpvm/actions/workflows/test.yml)
-[![Security](https://github.com/Thavarshan/phpvm/actions/workflows/security-test.yml/badge.svg)](https://github.com/Thavarshan/phpvm/actions/workflows/security-test.yml)
+[![CI Pipeline](https://github.com/Thavarshan/phpvm/actions/workflows/ci.yml/badge.svg)](https://github.com/Thavarshan/phpvm/actions/workflows/ci.yml)
 [![Version](https://img.shields.io/github/v/release/Thavarshan/phpvm.svg)](https://github.com/Thavarshan/phpvm/releases)
 [![GitHub stars](https://img.shields.io/github/stars/Thavarshan/phpvm.svg)](https://github.com/Thavarshan/phpvm/stargazers)
 
@@ -409,38 +408,33 @@ The BATS test suite verifies:
 
 ### Comprehensive GitHub Actions Testing
 
-The project features a streamlined CI/CD pipeline with comprehensive testing workflows:
+The project features a streamlined CI/CD pipeline with comprehensive testing in a single consolidated workflow:
 
-#### 1. **Core Testing** (`.github/workflows/test.yml`)
+#### **CI Pipeline** (`.github/workflows/ci.yml`)
 
-Comprehensive testing workflow including:
+Consolidated testing workflow including:
 
-- **Multi-Distribution Testing**: 13 Linux distributions across 4 package managers
-  - **Ubuntu**: 20.04, 22.04, 24.04
-  - **Debian**: 11 (Bullseye), 12 (Bookworm)
-  - **RHEL/CentOS**: Rocky Linux 8 & 9, AlmaLinux 8 & 9, Fedora 38 & 39
-  - **Arch Linux**: Latest
-  - **Alpine Linux**: 3.18, 3.19
-- **Cross-Platform Testing**: Ubuntu and macOS (Intel and Apple Silicon)
-- **PHP Usage Testing**: Installation, version switching, and auto-detection
-- **Performance Testing**: Startup time, concurrent operations, load testing
-- **Integration Testing**: End-to-end workflows, installation simulation, error recovery
+- **Quick Checks**: Shell syntax validation, ShellCheck analysis, code formatting, and quality checks
+- **Security Testing**: Input validation, path traversal protection, privilege escalation prevention, buffer overflow protection, file permission security, environment variable security, and symlink attack prevention
+- **BATS Test Suite**: Comprehensive automated testing across Ubuntu and macOS
+- **Core Functionality Tests**: Version commands, basic commands, error handling, and .phpvmrc auto-switching across multiple platforms
+- **PHP Integration Tests**: Installation flow, version operations, project workflows, and error recovery testing
+- **Multi-Distribution Testing** (scheduled weekly): 5 Linux distributions
+  - **Ubuntu**: 22.04, 24.04
+  - **Debian**: 12 (Bookworm)
+  - **Fedora**: 39
+  - **Alpine Linux**: 3.19
+- **Performance Testing** (scheduled weekly): Startup time benchmarks, concurrent operations, and load testing
+- **Quality Gate**: Final validation ensuring all required checks pass
 
-#### 2. **Security Testing** (`.github/workflows/security-test.yml`)
+#### **Release Workflow** (`.github/workflows/release.yml`)
 
-Specialized security validation including:
+Release-specific workflow including:
 
-- Input validation and injection prevention
-- Path traversal protection
-- Privilege escalation prevention
-- Buffer overflow protection
-- File permission security
-- Environment variable security
-- Symlink attack prevention
-
-#### 3. **Release Validation** (`.github/workflows/release.yml`)
-
-Release testing and validation for new versions.
+- Release readiness verification
+- Version consistency validation
+- Documentation checks
+- Release artifact generation and packaging
 
 ### Testing Coverage
 
