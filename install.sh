@@ -4,7 +4,7 @@
     set -e
 
     phpvm_has() {
-        command -v "$1" >/dev/null 2>&1
+        command -v "$1" > /dev/null 2>&1
     }
 
     phpvm_echo() {
@@ -86,7 +86,7 @@
         mkdir -p "$INSTALL_DIR/bin"
 
         phpvm_echo "Downloading phpvm script from $GITHUB_REPO_URL..."
-        phpvm_download "$GITHUB_REPO_URL" >"$INSTALL_DIR/phpvm.sh" || {
+        phpvm_download "$GITHUB_REPO_URL" > "$INSTALL_DIR/phpvm.sh" || {
             phpvm_err "Failed to download phpvm script"
             exit 1
         }
@@ -108,10 +108,10 @@
             # Check shell type and use appropriate syntax
             if echo "$PROFILE" | grep -q "zsh"; then
                 # For zsh - use proper if statement to prevent shell crash
-                printf "\nexport PHPVM_DIR=\"%s\"\nexport PATH=\"\$PHPVM_DIR/bin:\$PATH\"\nif [[ -s \"\$PHPVM_DIR/phpvm.sh\" ]]; then\n  source \"\$PHPVM_DIR/phpvm.sh\"\nfi\n" "$(phpvm_install_dir)" >>"$PROFILE"
+                printf "\nexport PHPVM_DIR=\"%s\"\nexport PATH=\"\$PHPVM_DIR/bin:\$PATH\"\nif [[ -s \"\$PHPVM_DIR/phpvm.sh\" ]]; then\n  source \"\$PHPVM_DIR/phpvm.sh\"\nfi\n" "$(phpvm_install_dir)" >> "$PROFILE"
             else
                 # For bash and others - use POSIX compatible syntax
-                printf "\nexport PHPVM_DIR=\"%s\"\nexport PATH=\"\$PHPVM_DIR/bin:\$PATH\"\n[ -s \"\$PHPVM_DIR/phpvm.sh\" ] && . \"\$PHPVM_DIR/phpvm.sh\"\n" "$(phpvm_install_dir)" >>"$PROFILE"
+                printf "\nexport PHPVM_DIR=\"%s\"\nexport PATH=\"\$PHPVM_DIR/bin:\$PATH\"\n[ -s \"\$PHPVM_DIR/phpvm.sh\" ] && . \"\$PHPVM_DIR/phpvm.sh\"\n" "$(phpvm_install_dir)" >> "$PROFILE"
             fi
         else
             phpvm_warn "Could not detect profile file. Please manually add the following to your shell profile:"
@@ -124,7 +124,8 @@
         # Only source the profile if it exists
         if [ -f "$PROFILE" ]; then
             # Use . instead of source for POSIX compatibility
-            . "$PROFILE" 2>/dev/null || true
+            # shellcheck disable=SC1090
+            . "$PROFILE" 2> /dev/null || true
         fi
 
         phpvm_echo "phpvm installation complete!"

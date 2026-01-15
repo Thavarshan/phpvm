@@ -1,7 +1,6 @@
 [![PHP Version Manager (phpvm)](./assets/Banner.png)](https://github.com/Thavarshan/phpvm)
 
-[![Test](https://github.com/Thavarshan/phpvm/actions/workflows/test.yml/badge.svg)](https://github.com/Thavarshan/phpvm/actions/workflows/test.yml)
-[![Security](https://github.com/Thavarshan/phpvm/actions/workflows/security-test.yml/badge.svg)](https://github.com/Thavarshan/phpvm/actions/workflows/security-test.yml)
+[![CI Pipeline](https://github.com/Thavarshan/phpvm/actions/workflows/ci.yml/badge.svg)](https://github.com/Thavarshan/phpvm/actions/workflows/ci.yml)
 [![Version](https://img.shields.io/github/v/release/Thavarshan/phpvm.svg)](https://github.com/Thavarshan/phpvm/releases)
 [![GitHub stars](https://img.shields.io/github/stars/Thavarshan/phpvm.svg)](https://github.com/Thavarshan/phpvm/stargazers)
 
@@ -15,7 +14,7 @@
 
 ```sh
 $ phpvm version
-phpvm version 1.5.0
+phpvm version 1.8.0
 
 PHP Version Manager for macOS and Linux
 Author: Jerome Thayananthajothy <tjthavarshan@gmail.com>
@@ -40,6 +39,8 @@ PHP 8.1.13
 - Install and manage multiple PHP versions.
 - Seamlessly switch between installed PHP versions.
 - Auto-switch PHP versions based on project `.phpvmrc`.
+- Alias management for versions (`phpvm alias`, `phpvm unalias`).
+- Cache directory inspection (`phpvm cache dir`).
 - Supports macOS (via Homebrew) and Linux distributions including WSL.
 - **Smart repository detection** for RHEL/Fedora systems with automatic setup guidance.
 - **Enhanced error handling** with actionable solutions when PHP packages are missing.
@@ -50,7 +51,7 @@ PHP 8.1.13
 - Post-install validation with helpful warnings for missing binaries.
 - Enhanced Homebrew integration with better link failure detection.
 - Informative, color-coded feedback with timestamps for logs.
-- Built-in self-tests for verifying functionality (`phpvm test`).
+- Comprehensive BATS test suite for verifying functionality.
 - Helper functions for better maintainability and reduced code duplication.
 
 ## Installation
@@ -98,8 +99,10 @@ If the installation was successful, it should output the path to `phpvm`.
 | `phpvm deactivate`         | Temporarily disable phpvm and restore PATH |
 | `phpvm system`             | Switch to system/Homebrew default PHP      |
 | `phpvm list` or `phpvm ls` | List all installed PHP versions            |
+| `phpvm alias [name] [ver]` | Create, update, or list version aliases    |
+| `phpvm unalias <name>`     | Remove version alias                       |
+| `phpvm cache dir`          | Show phpvm cache directory                 |
 | `phpvm auto`               | Auto-switch based on `.phpvmrc` file       |
-| `phpvm test`               | Run built-in self-tests                    |
 | `phpvm version`            | Show version information                   |
 | `phpvm --version`          | Show version information (alias)           |
 | `phpvm -v`                 | Show version information (alias)           |
@@ -197,6 +200,13 @@ phpvm auto
 
 phpvm will automatically detect and switch to the version specified in the `.phpvmrc` file.
 
+Aliases can also be used in `.phpvmrc`:
+
+```sh
+echo "default" > .phpvmrc
+phpvm auto
+```
+
 ### Listing Installed Versions
 
 To list all installed PHP versions:
@@ -207,15 +217,58 @@ phpvm list
 
 This will show all installed PHP versions and indicate the currently active one.
 
-### Running Self-Tests
+### Managing Aliases
 
-phpvm includes built-in self-tests to verify everything is working correctly:
+Create or update a version alias:
 
 ```sh
-phpvm test
+phpvm alias default 8.2
+phpvm alias production 8.1
 ```
 
-This will run a series of tests on your system to ensure all phpvm functions are working properly.
+List aliases:
+
+```sh
+phpvm alias
+```
+
+List aliases matching a pattern:
+
+```sh
+phpvm alias def
+```
+
+Remove an alias:
+
+```sh
+phpvm unalias production
+```
+
+Aliases also appear in `phpvm list` output when defined.
+
+You can also use `latest` or `stable` as shorthand for the latest installed PHP version:
+
+```sh
+phpvm use latest
+phpvm use stable
+```
+
+### Cache Directory
+
+Show the phpvm cache directory:
+
+```sh
+phpvm cache dir
+```
+
+### Planned Commands (Coming Soon)
+
+The following commands are in progress and may return a "not yet implemented" message:
+
+- `phpvm exec <version> <command> [args...]`
+- `phpvm run <version> [script] [args...]`
+- `phpvm ls-remote [pattern]`
+- `phpvm cache clear`
 
 ### Exit Codes
 
@@ -326,23 +379,26 @@ phpvm install 8.3
 
 ## Development & Testing
 
-phpvm features comprehensive testing across multiple platforms and scenarios. The project includes extensive GitHub Actions workflows that test every aspect of the script.
+phpvm features comprehensive testing using the BATS (Bash Automated Testing System) framework. The project includes extensive GitHub Actions workflows that test every aspect of the script.
 
-### Built-in Testing
+### Running Tests
 
-phpvm includes built-in self-tests that validate all core functionality:
+Run the BATS test suite to validate all functionality:
 
 ```sh
-# Run the built-in tests
-phpvm test
+# Run all tests
+make test-bats
 
-# Get detailed system information for debugging
-phpvm info
+# Or run BATS directly
+bats tests/
+
+# Run specific test file
+bats tests/01_core.bats
 ```
 
-The built-in test framework verifies:
+The BATS test suite verifies:
 
-- Output and formatting functions
+- Core functionality (version management, installation, switching)
 - System detection and OS compatibility
 - PHP version installation (mocked)
 - Version switching and validation
@@ -352,38 +408,33 @@ The built-in test framework verifies:
 
 ### Comprehensive GitHub Actions Testing
 
-The project features a streamlined CI/CD pipeline with comprehensive testing workflows:
+The project features a streamlined CI/CD pipeline with comprehensive testing in a single consolidated workflow:
 
-#### 1. **Core Testing** (`.github/workflows/test.yml`)
+#### **CI Pipeline** (`.github/workflows/ci.yml`)
 
-Comprehensive testing workflow including:
+Consolidated testing workflow including:
 
-- **Multi-Distribution Testing**: 13 Linux distributions across 4 package managers
-  - **Ubuntu**: 20.04, 22.04, 24.04
-  - **Debian**: 11 (Bullseye), 12 (Bookworm)
-  - **RHEL/CentOS**: Rocky Linux 8 & 9, AlmaLinux 8 & 9, Fedora 38 & 39
-  - **Arch Linux**: Latest
-  - **Alpine Linux**: 3.18, 3.19
-- **Cross-Platform Testing**: Ubuntu and macOS (Intel and Apple Silicon)
-- **PHP Usage Testing**: Installation, version switching, and auto-detection
-- **Performance Testing**: Startup time, concurrent operations, load testing
-- **Integration Testing**: End-to-end workflows, installation simulation, error recovery
+- **Quick Checks**: Shell syntax validation, ShellCheck analysis, code formatting, and quality checks
+- **Security Testing**: Input validation, path traversal protection, privilege escalation prevention, buffer overflow protection, file permission security, environment variable security, and symlink attack prevention
+- **BATS Test Suite**: Comprehensive automated testing across Ubuntu and macOS
+- **Core Functionality Tests**: Version commands, basic commands, error handling, and .phpvmrc auto-switching across multiple platforms
+- **PHP Integration Tests**: Installation flow, version operations, project workflows, and error recovery testing
+- **Multi-Distribution Testing** (scheduled weekly): 5 Linux distributions
+  - **Ubuntu**: 22.04, 24.04
+  - **Debian**: 12 (Bookworm)
+  - **Fedora**: 39
+  - **Alpine Linux**: 3.19
+- **Performance Testing** (scheduled weekly): Startup time benchmarks, concurrent operations, and load testing
+- **Quality Gate**: Final validation ensuring all required checks pass
 
-#### 2. **Security Testing** (`.github/workflows/security-test.yml`)
+#### **Release Workflow** (`.github/workflows/release.yml`)
 
-Specialized security validation including:
+Release-specific workflow including:
 
-- Input validation and injection prevention
-- Path traversal protection
-- Privilege escalation prevention
-- Buffer overflow protection
-- File permission security
-- Environment variable security
-- Symlink attack prevention
-
-#### 3. **Release Validation** (`.github/workflows/release.yml`)
-
-Release testing and validation for new versions.
+- Release readiness verification
+- Version consistency validation
+- Documentation checks
+- Release artifact generation and packaging
 
 ### Testing Coverage
 
