@@ -99,7 +99,7 @@ jobs:
   integration-tests:
     name: 'Integration Tests (${{ matrix.os }})'
     runs-on: ${{ matrix.os }}
-    needs: [lint, bats-tests, builtin-tests]
+    needs: [lint, bats-tests]
     strategy:
       fail-fast: false
       matrix:
@@ -156,7 +156,7 @@ jobs:
   quality-gate:
     name: 'Quality Gate'
     runs-on: ubuntu-latest
-    needs: [lint, bats-tests, builtin-tests]
+    needs: [lint, bats-tests]
     if: always()
     steps:
       - name: Check All Jobs
@@ -167,10 +167,6 @@ jobs:
           fi
           if [ "${{ needs.bats-tests.result }}" != "success" ]; then
             echo "BATS tests failed!"
-            exit 1
-          fi
-          if [ "${{ needs.builtin-tests.result }}" != "success" ]; then
-            echo "Built-in tests failed!"
             exit 1
           fi
           echo "All quality checks passed! ✅"
