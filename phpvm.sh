@@ -2,11 +2,11 @@
 
 # phpvm - A PHP Version Manager for macOS and Linux
 # Author: Jerome Thayananthajothy (tjthavarshan@gmail.com)
-# Version: 1.7.0
+# Version: 1.8.0
 
 # shellcheck disable=SC2155  # Allow declare and assign on same line for better readability
 
-PHPVM_VERSION="1.7.0"
+PHPVM_VERSION="1.8.0"
 
 # Test mode flag
 PHPVM_TEST_MODE="${PHPVM_TEST_MODE:-false}"
