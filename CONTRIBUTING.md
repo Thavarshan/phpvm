@@ -200,9 +200,6 @@ make release       # Prepare for release
 ### Direct Script Usage
 
 ```bash
-# Run quality assurance script
-./qa.sh
-
 # Run phpvm tests
 bash phpvm.sh test
 
@@ -366,9 +363,6 @@ make install-hooks
 ```bash
 # Run same checks as CI
 make check
-
-# Or use qa script
-./qa.sh
 ```
 
 ## Resources

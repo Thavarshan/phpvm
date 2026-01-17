@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Removed
+
+- **Redundant qa.sh script:** Removed `qa.sh` as its functionality is fully covered by `make check`.
+
 ## [v1.8.0](https://github.com/Thavarshan/phpvm/compare/v1.7.0...v1.8.0) - 2026-01-12
 
 ### Added
@@ -12,7 +16,7 @@
 - **Alias visibility:** `phpvm list` now shows configured aliases.
 - **Alias resolution in `.phpvmrc`:** `phpvm auto` now resolves aliases defined in `.phpvmrc`.
 - **Latest/stable keywords:** `latest` and `stable` now resolve to the latest installed PHP version.
-- **Quality assurance tooling:** Added ShellCheck and shfmt configuration, a QA Makefile, and a `qa.sh` runner script.
+- **Quality assurance tooling:** Added ShellCheck and shfmt configuration and a comprehensive QA Makefile.
 - **BATS test suite:** Added comprehensive BATS tests for core functionality and new alias behavior.
 - **CI quality workflow:** Added a quality workflow for linting, formatting, and tests.
 
