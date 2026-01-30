@@ -54,7 +54,6 @@
 - **Dnf module stream workflow:** Added inline documentation about RHEL/Fedora module stream management.
 - **Version bump:** Updated to v1.9.0.
 - **All tests passing:** 51 BATS tests pass (added 4 security tests for path traversal protection).
-- **Release documentation:** Added RELEASE_CHECKLIST.md and RELEASE_SUMMARY.md.
 
 ## [v1.8.0](https://github.com/Thavarshan/phpvm/compare/v1.7.0...v1.8.0) - 2026-01-12
 
