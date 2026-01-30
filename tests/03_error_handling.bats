@@ -106,3 +106,28 @@ load test_helper
     run phpvm_deactivate true
     [ "$status" -eq 0 ]
 }
+
+# Security tests for path traversal protection
+@test "phpvm alias rejects path traversal in name" {
+    run bash "$BATS_TEST_DIRNAME/../phpvm.sh" alias "../../../etc/passwd" "8.2"
+    [ "$status" -eq 2 ]
+    [[ "$output" =~ "Invalid alias name" ]]
+}
+
+@test "phpvm alias rejects slash in name" {
+    run bash "$BATS_TEST_DIRNAME/../phpvm.sh" alias "foo/bar" "8.2"
+    [ "$status" -eq 2 ]
+    [[ "$output" =~ "Invalid alias name" ]]
+}
+
+@test "phpvm_validate_alias_name rejects path traversal" {
+    run phpvm_validate_alias_name "../../../etc/passwd"
+    [ "$status" -eq 1 ]
+}
+
+@test "phpvm_validate_alias_name accepts valid names" {
+    run phpvm_validate_alias_name "default"
+    [ "$status" -eq 0 ]
+    run phpvm_validate_alias_name "my-alias_123"
+    [ "$status" -eq 0 ]
+}
