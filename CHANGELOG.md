@@ -2,9 +2,59 @@
 
 ## [Unreleased]
 
-### Removed
+## [v1.9.0](https://github.com/Thavarshan/phpvm/compare/v1.8.0...v1.9.0) - 2026-01-30
 
-- **Redundant qa.sh script:** Removed `qa.sh` as its functionality is fully covered by `make check`.
+### Fixed
+
+- **Fixed error propagation in version resolution:** Commands like `phpvm use latest` and `phpvm install latest` now correctly propagate failures from `phpvm_resolve_version` instead of silently swallowing errors.
+- **Fixed state consistency in `switch_to_system_php`:** State file (`active_version=system`) is now only written AFTER the switch operation succeeds, preventing state lies when brew link operations fail.
+- **Fixed apt install/uninstall symmetry:** Uninstall now removes `php${version}-cli`, `php${version}-common`, and `php${version}-fpm` packages symmetrically with what install creates.
+- **Fixed alias directory reliability:** Alias directory creation is now required (not best-effort). If `$PHPVM_DIR/alias` cannot be created, phpvm fails with a clear error message.
+- **Fixed symlink robustness:** `update_current_symlink` now uses `command -v php` to resolve the actual binary path, ensuring the symlink points to what the shell would execute.
+- **Fixed path traversal vulnerability in alias resolution:** `phpvm_resolve_version` now validates alias names before file access, preventing path traversal attacks like `../../../etc/passwd`.
+- **Fixed path traversal vulnerability in alias commands:** `phpvm_alias` now validates alias names BEFORE any file path operations.
+- **Fixed trap restoration in sourced shells:** `phpvm_with_lock` now explicitly clears traps with `trap - SIGNAL` when user had no existing trap, preventing phpvm's cleanup traps from being permanently installed in the user's shell session.
+- **Fixed init ordering for help/version commands:** Moved command parsing before `phpvm_init_or_die` so `phpvm help` and `phpvm version` work without requiring package manager detection or system initialization.
+- **Fixed Linux version listing accuracy:** Unified all Linux package managers (apt/dnf/yum/pacman) to use `phpvm_linux_installed_versions` which scans actual binaries, eliminating inaccurate package name listings like `8.2-cli` or `8.2-fpm`.
+- **Fixed system PHP symlink consistency:** System switching now calls `update_current_symlink` to maintain consistent `$PHPVM_DIR/current` symlink behavior across all switching modes.
+- **Fixed alias security vulnerability:** Reordered validation in `phpvm_alias` to validate version format before using it in file path checks, preventing potential path traversal attacks with malicious alias targets.
+- **Fixed yum installation strategy:** Implemented proper Remi repository detection and naming conventions (`php82-php-cli` format), replacing incorrect `yum install php8.2` approach that would always fail.
+- **Fixed lock PID staleness:** Added explicit `lock_pid=""` reset at top of each `phpvm_lock` loop iteration to prevent stale PID values in error messages.
+- **Fixed unversioned PHP formula detection:** Homebrew's unversioned `php` formula is now correctly identified before any unlinking operations, preventing false version matches from system PHP.
+- **Fixed `phpvm which` for unversioned formulas:** Correctly returns path to unversioned PHP installed as `php` formula.
+- **Fixed apt package search:** `pkg_search_php()` now explicitly checks for `Candidate: (none)` to avoid false positives from `apt-cache policy`.
+- **Fixed `echo` usage in input validation:** Replaced `echo "$var" | grep` with `printf '%s\n' "$var" | grep` throughout to prevent interpretation of strings like `-n`, `-e`, backslash escapes.
+- **Fixed `phpvm_which()` failure propagation:** Now properly propagates failures from `phpvm_current` using `|| return $?`.
+- **Fixed shellcheck SC2221/SC2222 warnings:** Simplified `phpvm_is_sourced()` case pattern to avoid overlapping matches.
+
+### Changed
+
+- **Introduced `command_exists()` helper:** Replaced 40+ instances of `command -v X > /dev/null 2>&1` with single reusable function for cleaner command availability checks.
+- **Introduced `ensure_phpvm_dirs()` function:** Consolidated repeated `mkdir -p $PHPVM_DIR/X` patterns into centralized directory creation function.
+- **Introduced `brew_link_php_unversioned()` function:** Extracted duplicate `brew link php --force --overwrite` logic with error handling into single reusable function.
+- **Introduced `is_valid_version_format()` function:** Consolidated duplicate version regex validation pattern into single validation helper.
+- **Added `brew_php_major_minor()` helper:** Reads version directly from `$HOMEBREW_PREFIX/opt/php/bin/php` instead of PATH-based `php -r`, eliminating conflicts with system PHP.
+- **Reordered version switching flow:** Now resolves target formula, then unlinks all PHP, then links resolved formula, preventing "version check breaks after unlink" bugs.
+- **Improved Linux binary scanning:** Broadened skip patterns to prevent accidentally executing PHP helper binaries (`*fpm*`, `*cgi*`, `*dbg*`, `*ize*`, `*config*`).
+- **Ubuntu/Debian apt packages:** Changed from non-existent `php8.2` to actual `php8.2-cli` format used by ondrej/sury PPA.
+- **Fedora/RHEL dnf packages:** Implemented correct module stream approach instead of fictional versioned packages.
+- **Brew availability check:** Changed from fragile `brew search | grep` to stable `brew info <formula>` API.
+- **Trap preservation in `phpvm_with_lock()`:** Now saves and restores user's existing trap handlers instead of clobbering them.
+- **Stale lock detection and auto-cleanup:** Lock mechanism now checks if lock holder PID is still running and automatically removes stale locks.
+
+### Added
+
+- **Interactive shell guard:** Auto-switch from `.phpvmrc` now only runs in interactive shells using `case $- in *i*)` pattern.
+- **Test mode package manager bypass:** Test mode now sets sandbox defaults without requiring actual brew/apt/dnf.
+
+### Internal
+
+- **Bash-only support documented:** Added explicit notice that script requires bash (uses bashisms).
+- **Intentional symlink behavior clarified:** Added comment explaining `update_current_symlink()` links to resolved `php` binary by design.
+- **Dnf module stream workflow:** Added inline documentation about RHEL/Fedora module stream management.
+- **Version bump:** Updated to v1.9.0.
+- **All tests passing:** 51 BATS tests pass (added 4 security tests for path traversal protection).
+- **Release documentation:** Added RELEASE_CHECKLIST.md and RELEASE_SUMMARY.md.
 
 ## [v1.8.0](https://github.com/Thavarshan/phpvm/compare/v1.7.0...v1.8.0) - 2026-01-12
 

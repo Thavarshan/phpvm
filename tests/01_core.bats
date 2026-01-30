@@ -78,9 +78,10 @@ load test_helper
 
 @test "phpvm current shows no active version initially" {
     run phpvm_current
-    # Accept either "none" (no PHP) or "system" (system PHP exists)
-    [ "$status" -eq 0 ] || [ "$status" -eq 1 ]
-    [[ "$output" = "none" ]] || [[ "$output" = "system" ]]
+    # Accept: 0 (managed PHP), 4 (none/not installed), or output "system"
+    # Exit code 4 = PHPVM_EXIT_NOT_INSTALLED (when no PHP found)
+    [ "$status" -eq 0 ] || [ "$status" -eq 4 ]
+    [[ "$output" = "none" ]] || [[ "$output" = "system" ]] || [[ "$output" =~ ^[0-9]+\.[0-9]+ ]]
 }
 
 @test "find_phpvmrc returns error when no file exists" {

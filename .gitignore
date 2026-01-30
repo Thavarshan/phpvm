@@ -131,3 +131,8 @@ dist
 
 # Mac files
 .DS_Store
+
+# notes
+notes.md
+FEATURE_CHECKLIST.md
+IMPLEMENTATION_GUIDE.md
