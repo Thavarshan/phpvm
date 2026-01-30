@@ -2740,16 +2740,17 @@ phpvm_alias() {
         return "$PHPVM_EXIT_INVALID_ARG"
     fi
 
-    # Validate version format BEFORE using it in path check (security)
-    # This prevents path traversal attacks with malicious version strings
-    if ! validate_php_version "$version"; then
-        phpvm_err "Invalid PHP version format: $version"
+    # Check if target is an alias BEFORE version validation
+    # This gives a better error message for alias chains
+    # Use phpvm_validate_alias_name first to ensure safe file access
+    if phpvm_validate_alias_name "$version" 2> /dev/null && [ -f "$PHPVM_DIR/alias/$version" ]; then
+        phpvm_err "Alias target '$version' is itself an alias. Please point aliases directly to a PHP version."
         return "$PHPVM_EXIT_INVALID_ARG"
     fi
 
-    # Now safe to check if target is an alias (version format is validated)
-    if [ -f "$PHPVM_DIR/alias/$version" ]; then
-        phpvm_err "Alias target '$version' is itself an alias. Please point aliases directly to a PHP version."
+    # Validate version format (security: prevents path traversal attacks)
+    if ! validate_php_version "$version"; then
+        phpvm_err "Invalid PHP version format: $version"
         return "$PHPVM_EXIT_INVALID_ARG"
     fi
 
