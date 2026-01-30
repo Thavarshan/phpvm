@@ -317,7 +317,7 @@ If you experience issues with `phpvm`, try the following:
 
 ### General Issues
 
-- Run `phpvm test` to verify all functions are working correctly
+- Run the test suite with `bats tests/` to verify all functions are working correctly
 - Check the phpvm version with `phpvm version` or `phpvm --version`
 - Ensure your shell profile is sourcing `phpvm.sh`
 - Restart your terminal after installing or updating

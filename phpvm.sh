@@ -362,6 +362,198 @@ sanitize_input() {
     return 0
 }
 
+# ============================================================================
+# PACKAGE MANAGER ABSTRACTION LAYER
+# Helper functions to reduce code duplication across package managers
+# ============================================================================
+
+# Get the package name format for a given PHP version
+# Usage: get_php_package_name <version>
+# Returns: Formatted package name (e.g., "php@8.2", "php8.2", "php")
+get_php_package_name() {
+    local version="$1"
+    case "$PKG_MANAGER" in
+    brew)
+        echo "php@${version}"
+        ;;
+    apt)
+        echo "php${version}"
+        ;;
+    dnf | yum)
+        echo "php${version}"
+        ;;
+    pacman)
+        # Arch typically uses unversioned 'php' package
+        echo "php"
+        ;;
+    *)
+        echo "php${version}"
+        ;;
+    esac
+}
+
+# Get the binary path for a PHP version
+# Usage: get_php_binary_path <version>
+# Returns: Full path to PHP binary
+get_php_binary_path() {
+    local version="$1"
+    case "$PKG_MANAGER" in
+    brew)
+        if [ -n "${HOMEBREW_PREFIX:-}" ]; then
+            echo "${HOMEBREW_PREFIX}/opt/php@${version}/bin/php"
+        else
+            echo "/opt/homebrew/opt/php@${version}/bin/php"
+        fi
+        ;;
+    apt | dnf | yum)
+        echo "/usr/bin/php${version}"
+        ;;
+    pacman)
+        echo "/usr/bin/php"
+        ;;
+    *)
+        echo "/usr/bin/php${version}"
+        ;;
+    esac
+}
+
+# Check if a PHP package is installed
+# Usage: is_php_package_installed <version>
+# Returns: 0 if installed, 1 if not
+is_php_package_installed() {
+    local version="$1"
+    local package_name
+
+    package_name=$(get_php_package_name "$version")
+
+    case "$PKG_MANAGER" in
+    brew)
+        brew list --versions "$package_name" > /dev/null 2>&1
+        ;;
+    apt)
+        dpkg -l 2> /dev/null | grep -q "^ii\s*${package_name}"
+        ;;
+    dnf | yum)
+        $PKG_MANAGER list installed 2> /dev/null | grep -q "^${package_name}"
+        ;;
+    pacman)
+        pacman -Qi "$package_name" > /dev/null 2>&1
+        ;;
+    *)
+        return 1
+        ;;
+    esac
+}
+
+# Install PHP package using the appropriate package manager
+# Usage: pkg_install_php <version>
+# Returns: 0 on success, 1 on failure
+pkg_install_php() {
+    local version="$1"
+    local package_name
+
+    package_name=$(get_php_package_name "$version")
+
+    case "$PKG_MANAGER" in
+    brew)
+        brew install "$package_name"
+        ;;
+    apt)
+        run_with_sudo apt-get install -y "$package_name"
+        ;;
+    dnf)
+        run_with_sudo dnf install -y "$package_name"
+        ;;
+    yum)
+        run_with_sudo yum install -y "$package_name"
+        ;;
+    pacman)
+        run_with_sudo pacman -S --noconfirm "$package_name"
+        ;;
+    *)
+        return 1
+        ;;
+    esac
+}
+
+# Uninstall PHP package using the appropriate package manager
+# Usage: pkg_uninstall_php <version>
+# Returns: 0 on success, 1 on failure
+pkg_uninstall_php() {
+    local version="$1"
+    local package_name
+
+    package_name=$(get_php_package_name "$version")
+
+    case "$PKG_MANAGER" in
+    brew)
+        brew uninstall "$package_name"
+        ;;
+    apt)
+        run_with_sudo apt-get remove -y "$package_name"
+        ;;
+    dnf)
+        run_with_sudo dnf remove -y "$package_name"
+        ;;
+    yum)
+        run_with_sudo yum remove -y "$package_name"
+        ;;
+    pacman)
+        run_with_sudo pacman -R --noconfirm "$package_name"
+        ;;
+    *)
+        return 1
+        ;;
+    esac
+}
+
+# Search for PHP packages in repositories
+# Usage: pkg_search_php <version>
+# Returns: 0 if found, 1 if not found, 2 if some PHP packages exist but not requested version
+pkg_search_php() {
+    local version="$1"
+    local package_name
+
+    package_name=$(get_php_package_name "$version")
+
+    case "$PKG_MANAGER" in
+    brew)
+        brew search "$package_name" 2> /dev/null | grep -q "^${package_name}$"
+        ;;
+    apt)
+        apt-cache search "$package_name" 2> /dev/null | grep -q "$package_name"
+        ;;
+    dnf)
+        if dnf search "$package_name" 2> /dev/null | grep -q "$package_name"; then
+            return 0
+        elif dnf search "php" 2> /dev/null | grep -q "php[0-9]"; then
+            return 2
+        else
+            return 1
+        fi
+        ;;
+    yum)
+        if yum search "$package_name" 2> /dev/null | grep -q "$package_name"; then
+            return 0
+        elif yum search "php" 2> /dev/null | grep -q "php[0-9]"; then
+            return 2
+        else
+            return 1
+        fi
+        ;;
+    pacman)
+        pacman -Ss "$package_name" 2> /dev/null | grep -q "^[^ ]*/${package_name}"
+        ;;
+    *)
+        return 1
+        ;;
+    esac
+}
+
+# ============================================================================
+# END PACKAGE MANAGER ABSTRACTION LAYER
+# ============================================================================
+
 # Validate PHP version format
 validate_php_version() {
     local version="$1"
@@ -496,39 +688,9 @@ check_remi_repository() {
 detect_php_availability() {
     local version="$1"
 
-    case "$PKG_MANAGER" in
-    dnf)
-        if dnf search "php$version" 2> /dev/null | grep -q "php$version"; then
-            return 0
-        elif dnf search "php" 2> /dev/null | grep -q "php[0-9]"; then
-            # Some PHP packages exist, but not the requested version
-            return 2
-        else
-            # No PHP packages found at all
-            return 1
-        fi
-        ;;
-    yum)
-        if yum search "php$version" 2> /dev/null | grep -q "php$version"; then
-            return 0
-        elif yum search "php" 2> /dev/null | grep -q "php[0-9]"; then
-            return 2
-        else
-            return 1
-        fi
-        ;;
-    apt)
-        if apt-cache search "php$version" 2> /dev/null | grep -q "php$version"; then
-            return 0
-        else
-            return 1
-        fi
-        ;;
-    *)
-        # For other package managers, assume available
-        return 0
-        ;;
-    esac
+    # Use the unified package search abstraction
+    pkg_search_php "$version"
+    return $?
 }
 
 # Provide repository setup suggestions for RHEL/Fedora systems
@@ -1236,53 +1398,24 @@ phpvm_which() {
     fi
 
     # Find PHP binary for specific version
-    case "$PKG_MANAGER" in
-    brew)
-        # Check Homebrew paths
-        local brew_prefix="${HOMEBREW_PREFIX:-/opt/homebrew}"
+    php_path=$(get_php_binary_path "$version")
 
-        # Try versioned formula first (php@8.1)
-        if [ -x "$brew_prefix/opt/php@$version/bin/php" ]; then
-            php_path="$brew_prefix/opt/php@$version/bin/php"
-        # Try unversioned formula (php) - check if it matches requested version
-        elif [ -x "$brew_prefix/opt/php/bin/php" ]; then
+    # Verify binary exists and is executable
+    if [ -n "$php_path" ] && [ -x "$php_path" ]; then
+        # For versioned packages, verify the version matches
+        if [ "$PKG_MANAGER" != "brew" ]; then
             local installed_version
-            installed_version=$("$brew_prefix/opt/php/bin/php" -v 2> /dev/null | command head -1 | command grep -oE '[0-9]+\.[0-9]+' | command head -1)
+            installed_version=$("$php_path" -v 2> /dev/null | command head -1 | command grep -oE '[0-9]+\.[0-9]+' | command head -1)
             if [ "$installed_version" = "$version" ]; then
-                php_path="$brew_prefix/opt/php/bin/php"
+                echo "$php_path"
+                return 0
             fi
+        else
+            # For brew, path already indicates correct version
+            echo "$php_path"
+            return 0
         fi
-        ;;
-    apt)
-        # Debian/Ubuntu paths
-        if [ -x "/usr/bin/php$version" ]; then
-            php_path="/usr/bin/php$version"
-        fi
-        ;;
-    dnf | yum)
-        # RHEL/Fedora paths - check Remi-style paths first
-        if [ -x "/usr/bin/php$version" ]; then
-            php_path="/usr/bin/php$version"
-        elif [ -x "/usr/bin/php" ]; then
-            # Check if default php matches version
-            local installed_version
-            installed_version=$(/usr/bin/php -v 2> /dev/null | command head -1 | command grep -oE '[0-9]+\.[0-9]+' | command head -1)
-            if [ "$installed_version" = "$version" ]; then
-                php_path="/usr/bin/php"
-            fi
-        fi
-        ;;
-    pacman)
-        # Arch Linux - PHP is typically just /usr/bin/php
-        if [ -x "/usr/bin/php" ]; then
-            local installed_version
-            installed_version=$(/usr/bin/php -v 2> /dev/null | command head -1 | command grep -oE '[0-9]+\.[0-9]+' | command head -1)
-            if [ "$installed_version" = "$version" ]; then
-                php_path="/usr/bin/php"
-            fi
-        fi
-        ;;
-    esac
+    fi
 
     if [ -z "$php_path" ]; then
         phpvm_err "PHP $version not found."
@@ -1725,60 +1858,19 @@ uninstall_php() {
         return 0
     fi
 
-    case "$PKG_MANAGER" in
-    brew)
-        if brew list --versions php@"$version" > /dev/null 2>&1; then
-            brew uninstall php@"$version" || {
-                phpvm_err "Failed to uninstall PHP $version with Homebrew."
-                return 1
-            }
-            phpvm_echo "PHP $version uninstalled."
-        else
-            phpvm_warn "PHP $version is not installed via Homebrew."
-            return 1
-        fi
-        ;;
-    apt)
-        if dpkg -l | grep -q "^ii\s*php$version\s"; then
-            run_with_sudo apt-get remove -y php"$version" || {
-                phpvm_err "Failed to uninstall PHP $version with apt."
-                return 1
-            }
-            phpvm_echo "PHP $version uninstalled."
-        else
-            phpvm_warn "PHP $version is not installed via apt."
-            return 1
-        fi
-        ;;
-    dnf | yum)
-        if $PKG_MANAGER list installed | grep -q "^php$version$"; then
-            run_with_sudo "$PKG_MANAGER" remove -y php"$version" || {
-                phpvm_err "Failed to uninstall PHP $version with $PKG_MANAGER."
-                return 1
-            }
-            phpvm_echo "PHP $version uninstalled."
-        else
-            phpvm_warn "PHP $version is not installed via $PKG_MANAGER."
-            return 1
-        fi
-        ;;
-    pacman)
-        if pacman -Qi php"$version" > /dev/null 2>&1; then
-            run_with_sudo pacman -R --noconfirm php"$version" || {
-                phpvm_err "Failed to uninstall PHP $version with pacman."
-                return 1
-            }
-            phpvm_echo "PHP $version uninstalled."
-        else
-            phpvm_warn "PHP $version is not installed via pacman."
-            return 1
-        fi
-        ;;
-    *)
-        phpvm_err "Uninstall not supported for this package manager."
+    # Check if package is installed using abstraction layer
+    if ! is_php_package_installed "$version"; then
+        phpvm_warn "PHP $version is not installed via $PKG_MANAGER."
         return 1
-        ;;
-    esac
+    fi
+
+    # Uninstall using abstraction layer
+    if ! pkg_uninstall_php "$version"; then
+        phpvm_err "Failed to uninstall PHP $version with $PKG_MANAGER."
+        return 1
+    fi
+
+    phpvm_echo "PHP $version uninstalled."
 
     # Clean up symlink and active version if needed
     if [ -f "$PHPVM_ACTIVE_VERSION_FILE" ] && [ "$(command cat "$PHPVM_ACTIVE_VERSION_FILE")" = "$version" ]; then

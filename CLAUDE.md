@@ -47,10 +47,10 @@ The tool detects and works with multiple package managers:
 - Handles corrupted/invalid `.phpvmrc` files gracefully
 
 ### Testing Framework
-- Built-in self-tests (`phpvm test`)
-- Mock environment creation for testing
+- BATS (Bash Automated Testing System) test suite in `tests/` directory
+- Mock environment creation for testing with `PHPVM_TEST_MODE=true`
 - Comprehensive test coverage including edge cases
-- No external testing dependencies required
+- Run tests with: `bats tests/`
 
 ## Development Guidelines
 
@@ -61,8 +61,8 @@ The tool detects and works with multiple package managers:
 - Helper functions to reduce code duplication
 
 ### Testing
-- Run tests: `./phpvm.sh test`
-- Tests create isolated mock environments
+- Run tests: `bats tests/`
+- Tests create isolated mock environments with `PHPVM_TEST_MODE=true`
 - All core functionality is tested including error conditions
 - Tests verify cross-platform compatibility
 - GitHub Actions runs automated tests on Ubuntu and macOS
@@ -77,10 +77,11 @@ The tool detects and works with multiple package managers:
 ## Common Development Tasks
 
 ### Adding New Commands
+
 1. Add command handler in the `main()` function case statement
 2. Implement the command function following naming convention `command_name()`
 3. Add help text in `print_help()`
-4. Add tests in the `run_tests()` function
+4. Add BATS tests in the `tests/` directory
 
 ### Supporting New Package Managers
 1. Add detection logic in `detect_system()`
@@ -90,16 +91,20 @@ The tool detects and works with multiple package managers:
 5. Add uninstall logic in `uninstall_php()`
 
 ### Testing Changes
+
 ```bash
 # Run all tests
-./phpvm.sh test
+bats tests/
+
+# Run specific test file
+bats tests/01_core.bats
 
 # Enable debug mode for troubleshooting
-DEBUG=true ./phpvm.sh test
+DEBUG=true bats tests/
 
-# Test specific functionality manually
-DEBUG=true ./phpvm.sh install 8.1
-DEBUG=true ./phpvm.sh use 8.1
+# Test specific functionality manually with test mode
+PHPVM_TEST_MODE=true DEBUG=true ./phpvm.sh install 8.1
+PHPVM_TEST_MODE=true DEBUG=true ./phpvm.sh use 8.1
 
 # Check shell syntax
 bash -n phpvm.sh
@@ -119,13 +124,13 @@ time ./phpvm.sh help
 
 ## Key Functions in phpvm.sh
 
-- `main()` - Entry point with command routing (phpvm.sh:960+)
-- `detect_system()` - Package manager and OS detection (phpvm.sh:65)
-- `install_php()` - PHP version installation logic (phpvm.sh:115+)
-- `use_php_version()` - Version switching functionality (phpvm.sh:186+)
-- `find_phpvmrc()` - Auto-detection of .phpvmrc files (phpvm.sh:270+)
-- `run_tests()` - Built-in test framework (phpvm.sh:470+)
-- Helper functions: `run_with_sudo()`, `log_with_timestamp()`, output functions
+- `main()` - Entry point with command routing
+- `detect_system()` - Package manager and OS detection
+- `install_php()` - PHP version installation logic
+- `use_php_version()` - Version switching functionality
+- `find_phpvmrc()` - Auto-detection of .phpvmrc files
+- Helper functions: `run_with_sudo()`, `phpvm_echo()`, `phpvm_err()`, `phpvm_warn()`, `phpvm_debug()`
+- Package manager abstraction: `pkg_install_php()`, `pkg_uninstall_php()`, `pkg_search_php()`
 
 ## File Structure
 

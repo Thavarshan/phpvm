@@ -142,15 +142,6 @@ make check
 
 Add tests for new features:
 
-**Built-in tests** - Add to `phpvm.sh` `run_tests()` function:
-
-```bash
-test_your_feature() {
-    # Test logic here
-    return 0
-}
-```
-
 **BATS tests** - Add to appropriate file in `tests/`:
 
 ```bash
@@ -201,8 +192,6 @@ make release       # Prepare for release
 
 ```bash
 # Run phpvm tests
-bash phpvm.sh test
-
 # Run BATS tests
 bats tests/
 
