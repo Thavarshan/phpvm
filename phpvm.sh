@@ -11,7 +11,7 @@
 
 # shellcheck disable=SC2155  # Allow declare and assign on same line for better readability
 
-PHPVM_VERSION="1.9.3"
+PHPVM_VERSION="1.9.4"
 
 # Test mode flag
 PHPVM_TEST_MODE="${PHPVM_TEST_MODE:-false}"

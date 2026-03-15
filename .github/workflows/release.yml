@@ -22,7 +22,7 @@ jobs:
           required_files=(
             "phpvm.sh"
             "install.sh"
-            "README.MD"
+            "README.md"
             "CHANGELOG.md"
             "LICENSE"
           )
@@ -63,7 +63,7 @@ jobs:
           sections=("Installation" "Usage" "Commands")
 
           for section in "${sections[@]}"; do
-            if grep -qi "$section" README.MD; then
+            if grep -qi "$section" README.md; then
               echo "✓ README contains $section section"
             else
               echo "⚠ README might be missing $section section"
@@ -89,7 +89,7 @@ jobs:
           mkdir -p dist
           cp phpvm.sh dist/
           cp install.sh dist/
-          cp README.MD dist/
+          cp README.md dist/
           cp LICENSE dist/
           cp CHANGELOG.md dist/
 

@@ -116,11 +116,32 @@ time ./phpvm.sh help
 ```
 
 ### Release Process
-1. Update version number in `PHPVM_VERSION` variable
-2. Update CHANGELOG.md with new features/fixes
-3. Test across different platforms
-4. Ensure all tests pass
-5. Update README.md if needed
+
+Conventions: tag = `X.Y.Z` (no `v` prefix), title = `vX.Y.Z` (with `v` prefix).
+
+1. **Bump version** in `PHPVM_VERSION` variable at the top of `phpvm.sh`
+2. **Update CHANGELOG.md** — add a new section under `[Unreleased]` following the existing format:
+   ```
+   ## [vX.Y.Z](https://github.com/Thavarshan/phpvm/compare/vPREV...vX.Y.Z) - YYYY-MM-DD
+   ```
+   Use subsections: `### Fixed`, `### Changed`, `### Removed`, `### Internal` as needed.
+3. **Verify syntax and tests pass:**
+   ```bash
+   bash -n phpvm.sh
+   bats tests/
+   ```
+4. **Commit and push:**
+   ```bash
+   git add phpvm.sh CHANGELOG.md
+   git commit -m "chore: release vX.Y.Z — short description"
+   git push origin main
+   ```
+5. **Create GitHub release** (triggers the `release.yml` workflow):
+   ```bash
+   gh release create X.Y.Z --title "vX.Y.Z" --notes-file /path/to/notes.md
+   ```
+   Or use `--notes "..."` for short notes. Prefer `--notes-file` for multi-line content to avoid shell quoting issues.
+6. **Update README.md** if needed (new features, changed env vars, etc.)
 
 ## Key Functions in phpvm.sh
 
@@ -139,7 +160,7 @@ phpvm/
 ├── CLAUDE.md          # This file
 ├── CHANGELOG.md       # Release history
 ├── LICENSE           # MIT license
-├── README.MD         # User documentation
+├── README.md         # User documentation
 ├── TESTING.md        # Testing documentation (minimal)
 ├── assets/           # Project images
 ├── install-bats.sh   # BATS installation script

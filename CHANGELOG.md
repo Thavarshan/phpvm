@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [v1.9.4](https://github.com/Thavarshan/phpvm/compare/v1.9.3...v1.9.4) - 2026-03-15
+
+### Fixed
+
+- **Fixed `README.MD` → `README.md` casing in `release.yml`:** The release workflow referenced `README.MD` but the file is `README.md`, causing CI failures on case-sensitive Linux filesystems.
+- **Fixed `README.MD` → `README.md` casing in `CLAUDE.md` file structure diagram.**
+
+### Internal
+
+- **Version bump:** Updated to v1.9.4.
+
 ## [v1.9.3](https://github.com/Thavarshan/phpvm/compare/v1.9.2...v1.9.3) - 2026-03-15
 
 ### Fixed
