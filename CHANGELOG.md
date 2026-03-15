@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+## [v1.9.1](https://github.com/Thavarshan/phpvm/compare/v1.9.0...v1.9.1) - 2026-03-15
+
+### Fixed
+
+- **Fixed `phpvm_debug` returning non-zero in non-debug mode:** Changed from `[ test ] && cmd` pattern (which returns exit code 1 when DEBUG is off) to `if/then/fi`, preventing silent failures in `set -e` contexts or when used as last statement before `return $?`.
+- **Fixed `phpvm_with_lock` lock leak on interruption:** Moved `phpvm_unlock` before trap restoration so the lock is released while cleanup traps are still active, eliminating the window where an interrupt could leak the lock.
+- **Fixed `get_php_binary_path` stdout side-effect on Linux:** Captured `linux_find_php_binary` output into a variable before echoing, preventing potential double output when the function's stdout mixed with the fallback path.
+
+### Changed
+
+- **Eliminated double initialization:** Removed redundant `phpvm_init_if_needed` calls from `install_php`, `use_php_version`, `phpvm_current`, `phpvm_which`, `list_installed_versions`, `auto_switch_php_version`, and `uninstall_php`. Initialization is now handled centrally by `main()` (via `phpvm_init_or_die`) and the sourced-path entry point, avoiding duplicate `detect_system()` calls (notably the expensive `brew --prefix`).
+- **Moved `package_name` computation in `install_php`:** The `get_php_package_name` call was computed but unused by most package manager branches. It is now only computed in the `pacman` case arm that actually needs it.
+
+### Internal
+
+- **Version bump:** Updated to v1.9.1.
+- **All tests passing:** 51 BATS tests pass.
+
 ## [v1.9.0](https://github.com/Thavarshan/phpvm/compare/v1.8.0...v1.9.0) - 2026-01-30
 
 ### Fixed

@@ -2,7 +2,7 @@
 
 # phpvm - A PHP Version Manager for macOS and Linux
 # Author: Jerome Thayananthajothy (tjthavarshan@gmail.com)
-# Version: 1.9.0
+# Version: 1.9.1
 #
 # IMPORTANT: This script is written for bash and uses bashisms (arrays, process substitution, etc.)
 # For sourcing into your shell, use bash only. Zsh users should run phpvm via:
@@ -11,7 +11,7 @@
 
 # shellcheck disable=SC2155  # Allow declare and assign on same line for better readability
 
-PHPVM_VERSION="1.9.0"
+PHPVM_VERSION="1.9.1"
 
 # Test mode flag
 PHPVM_TEST_MODE="${PHPVM_TEST_MODE:-false}"
@@ -251,7 +251,7 @@ phpvm_log() {
 phpvm_echo() { phpvm_log "INFO" "$*"; }
 phpvm_err() { phpvm_log "ERROR" "$*" >&2; }
 phpvm_warn() { phpvm_log "WARNING" "$*" >&2; }
-phpvm_debug() { [ "$DEBUG" = "true" ] && log_with_timestamp "DEBUG" "$*"; }
+phpvm_debug() { if [ "$DEBUG" = "true" ]; then log_with_timestamp "DEBUG" "$*"; fi; }
 
 # Atomic file write - writes to temp file then moves to target
 # This prevents race conditions and partial writes
@@ -413,6 +413,10 @@ phpvm_with_lock() {
     "$func" "$@"
     result=$?
 
+    # Unlock BEFORE restoring traps to prevent lock leaks if interrupted
+    # between trap restoration and unlock
+    phpvm_unlock
+
     # Restore original traps (or explicitly clear if user had none)
     # Critical: if saved_*_trap is empty, user had no trap, so clear ours with 'trap -'
     if [ -n "$saved_exit_trap" ]; then
@@ -436,7 +440,6 @@ phpvm_with_lock() {
         trap - HUP
     fi
 
-    phpvm_unlock
     return "$result"
 }
 
@@ -777,7 +780,13 @@ get_php_binary_path() {
         ;;
     apt | dnf | yum | pacman)
         # Use linux_find_php_binary for reliable path resolution
-        linux_find_php_binary "$normalized_version" || echo "/usr/bin/php${normalized_version}"
+        # Capture output to prevent any stdout side-effects from mixing with fallback
+        local found_binary
+        if found_binary=$(linux_find_php_binary "$normalized_version"); then
+            echo "$found_binary"
+        else
+            echo "/usr/bin/php${normalized_version}"
+        fi
         ;;
     *)
         echo "/usr/bin/php${normalized_version}"
@@ -1348,20 +1357,12 @@ linux_set_php_alternative() {
 # Install PHP using the detected package manager
 install_php() {
     local version="$1"
-    local package_name
-    local init_status
     local normalized_version
 
     [ -z "$version" ] && {
         phpvm_err "No PHP version specified for installation."
         return "$PHPVM_EXIT_INVALID_ARG"
     }
-
-    phpvm_init_if_needed
-    init_status=$?
-    if [ "$init_status" -ne 0 ]; then
-        return "$init_status"
-    fi
 
     # Resolve aliases to actual versions - propagate failure
     if ! version=$(phpvm_resolve_version "$version"); then
@@ -1393,7 +1394,6 @@ install_php() {
         phpvm_echo "PHP $normalized_version installed."
         return "$PHPVM_EXIT_SUCCESS"
     fi
-    package_name=$(get_php_package_name "$normalized_version") || return "$PHPVM_EXIT_ERROR"
 
     case "$PKG_MANAGER" in
     brew)
@@ -1409,6 +1409,8 @@ install_php() {
         install_php_yum "$normalized_version" || return $?
         ;;
     pacman)
+        local package_name
+        package_name=$(get_php_package_name "$normalized_version") || return "$PHPVM_EXIT_ERROR"
         install_php_pacman "$normalized_version" "$package_name" || return $?
         ;;
     *)
@@ -1682,19 +1684,12 @@ get_installed_php_version() {
 # Switch to a specific PHP version
 use_php_version() {
     local version="$1"
-    local init_status
     local normalized_version
 
     [ -z "$version" ] && {
         phpvm_err "No PHP version specified to switch."
         return "$PHPVM_EXIT_INVALID_ARG"
     }
-
-    phpvm_init_if_needed
-    init_status=$?
-    if [ "$init_status" -ne 0 ]; then
-        return "$init_status"
-    fi
 
     # Resolve aliases to actual versions - propagate failure
     if ! version=$(phpvm_resolve_version "$version"); then
@@ -1946,13 +1941,6 @@ system_php_version() {
 phpvm_current() {
     local active_version=""
     local php_version=""
-    local init_status
-
-    phpvm_init_if_needed
-    init_status=$?
-    if [ "$init_status" -ne 0 ]; then
-        return "$init_status"
-    fi
 
     # First, check the active version file
     if [ -f "$PHPVM_ACTIVE_VERSION_FILE" ]; then
@@ -1998,14 +1986,7 @@ phpvm_current() {
 phpvm_which() {
     local version="$1"
     local php_path=""
-    local init_status
     local normalized_version
-
-    phpvm_init_if_needed
-    init_status=$?
-    if [ "$init_status" -ne 0 ]; then
-        return "$init_status"
-    fi
 
     # If no version specified, use current (propagate failure if it fails)
     if [ -z "$version" ]; then
@@ -2197,14 +2178,7 @@ find_phpvmrc() {
 auto_switch_php_version() {
     local phpvmrc_file
     local version
-    local init_status
     local normalized_version
-
-    phpvm_init_if_needed
-    init_status=$?
-    if [ "$init_status" -ne 0 ]; then
-        return "$init_status"
-    fi
 
     if ! phpvmrc_file=$(find_phpvmrc); then
         phpvm_warn "No .phpvmrc file found in the current or parent directories."
@@ -2290,13 +2264,6 @@ list_installed_versions() {
     local base_name
     local version
     local active_version
-    local init_status
-
-    phpvm_init_if_needed
-    init_status=$?
-    if [ "$init_status" -ne 0 ]; then
-        return "$init_status"
-    fi
 
     phpvm_echo "Installed PHP versions:"
 
@@ -2526,19 +2493,12 @@ uninstall_php() {
     local version="$1"
     local mock_dir
     local test_prefix
-    local init_status
     local normalized_version
 
     [ -z "$version" ] && {
         phpvm_err "No PHP version specified for uninstallation."
         return "$PHPVM_EXIT_INVALID_ARG"
     }
-
-    phpvm_init_if_needed
-    init_status=$?
-    if [ "$init_status" -ne 0 ]; then
-        return "$init_status"
-    fi
 
     # Resolve aliases to actual versions - propagate failure
     if ! version=$(phpvm_resolve_version "$version"); then
