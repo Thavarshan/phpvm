@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+## [v1.9.2](https://github.com/Thavarshan/phpvm/compare/v1.9.1...v1.9.2) - 2026-03-15
+
+### Changed
+
+- **Namespaced global OS variables:** Renamed `OS_TYPE`, `OS_ARCH`, `MACOS_VERSION`, `MACOS_MAJOR`, `MACOS_MINOR`, `IS_WSL`, `WSL_VERSION`, `LINUX_DISTRO`, and `LINUX_VERSION` to `PHPVM_`-prefixed equivalents (`PHPVM_OS_TYPE`, etc.) to prevent namespace pollution when the script is sourced into user shells.
+- **Made `.phpvmrc` search depth configurable:** `find_phpvmrc` now uses `PHPVM_PHPVMRC_MAX_DEPTH` environment variable (default: 25) instead of a hardcoded value.
+- **Replaced `echo` with `printf` in version validation:** `is_valid_version_format()` and `phpvm_normalize_version()` now use `printf '%s\n'` to avoid potential misinterpretation of version strings starting with `-e` or `-n`.
+- **Inlined nested functions in `suggest_repository_setup`:** Removed `suggest_repository_heading()` and `suggest_repository_footer()` inner function definitions that were re-created on every call.
+- **Fixed word-splitting in `brew_unlink_all_php`:** Replaced `for ... in $(echo | grep)` pattern with a safe `while IFS= read -r` loop.
+
+### Removed
+
+- **Removed unused `PHPVM_CACHE_UPDATE_ALTERNATIVES` variable.**
+
+### Internal
+
+- **Version bump:** Updated to v1.9.2.
+- **All tests passing:** 51 BATS tests pass.
+
 ## [v1.9.1](https://github.com/Thavarshan/phpvm/compare/v1.9.0...v1.9.1) - 2026-03-15
 
 ### Fixed

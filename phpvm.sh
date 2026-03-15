@@ -11,7 +11,7 @@
 
 # shellcheck disable=SC2155  # Allow declare and assign on same line for better readability
 
-PHPVM_VERSION="1.9.1"
+PHPVM_VERSION="1.9.2"
 
 # Test mode flag
 PHPVM_TEST_MODE="${PHPVM_TEST_MODE:-false}"
@@ -37,7 +37,6 @@ PHPVM_EXIT_UNKNOWN_CMD=127 # Unknown command
 # Cache for command availability checks
 PHPVM_CACHE_PHP_CONFIG=""
 PHPVM_CACHE_PHP=""
-PHPVM_CACHE_UPDATE_ALTERNATIVES=""
 
 # Helper to check if a command exists (DRY for 'command -v X > /dev/null 2>&1')
 # Usage: command_exists <command_name>
@@ -445,57 +444,57 @@ phpvm_with_lock() {
 
 # Get OS information
 get_os_info() {
-    OS_TYPE="$(command uname -s)"
-    OS_ARCH="$(command uname -m)"
+    PHPVM_OS_TYPE="$(command uname -s)"
+    PHPVM_OS_ARCH="$(command uname -m)"
 
     # Detect macOS version
-    if [ "$OS_TYPE" = "Darwin" ]; then
+    if [ "$PHPVM_OS_TYPE" = "Darwin" ]; then
         if command_exists sw_vers; then
-            MACOS_VERSION="$(sw_vers -productVersion)"
-            MACOS_MAJOR="$(echo "$MACOS_VERSION" | command cut -d. -f1)"
-            MACOS_MINOR="$(echo "$MACOS_VERSION" | command cut -d. -f2)"
+            PHPVM_MACOS_VERSION="$(sw_vers -productVersion)"
+            PHPVM_MACOS_MAJOR="$(echo "$PHPVM_MACOS_VERSION" | command cut -d. -f1)"
+            PHPVM_MACOS_MINOR="$(echo "$PHPVM_MACOS_VERSION" | command cut -d. -f2)"
         fi
     fi
 
     # Detect Linux distribution and WSL
-    if [ "$OS_TYPE" = "Linux" ]; then
+    if [ "$PHPVM_OS_TYPE" = "Linux" ]; then
         # Check for WSL (Windows Subsystem for Linux)
         if [ -f "/proc/version" ] && command grep -qi "microsoft\|WSL" /proc/version 2> /dev/null; then
-            IS_WSL=true
+            PHPVM_IS_WSL=true
             if command grep -qi "wsl2" /proc/version 2> /dev/null; then
-                WSL_VERSION="2"
+                PHPVM_WSL_VERSION="2"
             else
-                WSL_VERSION="1"
+                PHPVM_WSL_VERSION="1"
             fi
-            phpvm_debug "Detected WSL $WSL_VERSION environment"
+            phpvm_debug "Detected WSL $PHPVM_WSL_VERSION environment"
         else
-            IS_WSL=false
+            PHPVM_IS_WSL=false
         fi
 
         # Try modern method first
         if [ -f "/etc/os-release" ]; then
             # shellcheck disable=SC1091
             . /etc/os-release
-            LINUX_DISTRO="$ID"
-            LINUX_VERSION="$VERSION_ID"
+            PHPVM_LINUX_DISTRO="$ID"
+            PHPVM_LINUX_VERSION="$VERSION_ID"
         elif [ -f "/etc/lsb-release" ]; then
             # shellcheck disable=SC1091
             . /etc/lsb-release
-            LINUX_DISTRO="$(echo "$DISTRIB_ID" | tr '[:upper:]' '[:lower:]')"
-            LINUX_VERSION="$DISTRIB_RELEASE"
+            PHPVM_LINUX_DISTRO="$(echo "$DISTRIB_ID" | tr '[:upper:]' '[:lower:]')"
+            PHPVM_LINUX_VERSION="$DISTRIB_RELEASE"
         elif [ -f "/etc/redhat-release" ]; then
-            LINUX_DISTRO="rhel"
-            LINUX_VERSION="$(command grep -o '[0-9]' /etc/redhat-release | command head -1)"
+            PHPVM_LINUX_DISTRO="rhel"
+            PHPVM_LINUX_VERSION="$(command grep -o '[0-9]' /etc/redhat-release | command head -1)"
         elif [ -f "/etc/debian_version" ]; then
-            LINUX_DISTRO="debian"
-            LINUX_VERSION="$(command cat /etc/debian_version)"
+            PHPVM_LINUX_DISTRO="debian"
+            PHPVM_LINUX_VERSION="$(command cat /etc/debian_version)"
         fi
 
         # WSL-specific adjustments
-        if [ "$IS_WSL" = "true" ]; then
+        if [ "$PHPVM_IS_WSL" = "true" ]; then
             phpvm_debug "WSL detected - applying WSL-specific configurations"
             # WSL may have different PATH requirements
-            if [ "$WSL_VERSION" = "1" ]; then
+            if [ "$PHPVM_WSL_VERSION" = "1" ]; then
                 phpvm_warn "WSL 1 detected. Some features may not work as expected."
             fi
         fi
@@ -516,7 +515,7 @@ detect_system() {
         return 0
     fi
 
-    if [ "$OS_TYPE" = "Darwin" ]; then
+    if [ "$PHPVM_OS_TYPE" = "Darwin" ]; then
         PKG_MANAGER="brew"
         if ! command_exists brew; then
             phpvm_err "Homebrew is not installed. Please install Homebrew first."
@@ -531,7 +530,7 @@ detect_system() {
 
         # Fallback for different macOS versions
         if [ -z "$HOMEBREW_PREFIX" ]; then
-            if [ "$OS_ARCH" = "arm64" ] && [ -d "/opt/homebrew" ]; then
+            if [ "$PHPVM_OS_ARCH" = "arm64" ] && [ -d "/opt/homebrew" ]; then
                 HOMEBREW_PREFIX="/opt/homebrew"
             elif [ -d "/usr/local" ]; then
                 HOMEBREW_PREFIX="/usr/local"
@@ -539,13 +538,13 @@ detect_system() {
         fi
 
         PHP_BIN_PATH="$HOMEBREW_PREFIX/bin"
-        phpvm_debug "Detected macOS $MACOS_VERSION on $OS_ARCH, Homebrew prefix: $HOMEBREW_PREFIX"
+        phpvm_debug "Detected macOS $PHPVM_MACOS_VERSION on $PHPVM_OS_ARCH, Homebrew prefix: $HOMEBREW_PREFIX"
         return 0
     fi
 
     # Enhanced Linux package manager detection with distribution-specific logic
-    if [ "$OS_TYPE" = "Linux" ]; then
-        phpvm_debug "Detected Linux distribution: $LINUX_DISTRO $LINUX_VERSION"
+    if [ "$PHPVM_OS_TYPE" = "Linux" ]; then
+        phpvm_debug "Detected Linux distribution: $PHPVM_LINUX_DISTRO $PHPVM_LINUX_VERSION"
 
         # Debian/Ubuntu family
         if command_exists apt-get; then
@@ -553,7 +552,7 @@ detect_system() {
             PHP_BIN_PATH="/usr/bin"
 
             # Check for specific Ubuntu/Debian PHP package patterns
-            if [ "$LINUX_DISTRO" = "ubuntu" ] || [ "$LINUX_DISTRO" = "debian" ]; then
+            if [ "$PHPVM_LINUX_DISTRO" = "ubuntu" ] || [ "$PHPVM_LINUX_DISTRO" = "debian" ]; then
                 # Modern Ubuntu/Debian uses ondrej/sury PPA for multiple PHP versions
                 # No additional adjustments needed - handled by package abstraction layer
                 :
@@ -569,10 +568,10 @@ detect_system() {
             PHP_BIN_PATH="/usr/bin"
 
             # RHEL/CentOS specific adjustments
-            if [ "$LINUX_DISTRO" = "rhel" ] || [ "$LINUX_DISTRO" = "centos" ]; then
+            if [ "$PHPVM_LINUX_DISTRO" = "rhel" ] || [ "$PHPVM_LINUX_DISTRO" = "centos" ]; then
                 # May need EPEL repository for modern PHP versions
-                if [ -n "$LINUX_VERSION" ] && [ "$LINUX_VERSION" -lt 8 ]; then
-                    phpvm_warn "RHEL/CentOS $LINUX_VERSION may require EPEL repository for modern PHP versions"
+                if [ -n "$PHPVM_LINUX_VERSION" ] && [ "$PHPVM_LINUX_VERSION" -lt 8 ]; then
+                    phpvm_warn "RHEL/CentOS $PHPVM_LINUX_VERSION may require EPEL repository for modern PHP versions"
                 fi
             fi
 
@@ -604,12 +603,12 @@ detect_system() {
 
         else
             phpvm_err "No supported package manager found (apt, dnf, yum, pacman, or brew)."
-            phpvm_warn "Detected: $LINUX_DISTRO $LINUX_VERSION"
+            phpvm_warn "Detected: $PHPVM_LINUX_DISTRO $PHPVM_LINUX_VERSION"
             phpvm_warn "Consider installing one of the supported package managers or Linuxbrew."
             return 1
         fi
     else
-        phpvm_err "Unsupported operating system: $OS_TYPE"
+        phpvm_err "Unsupported operating system: $PHPVM_OS_TYPE"
         return 1
     fi
 
@@ -659,7 +658,7 @@ phpvm_normalize_version() {
     local version="$1"
 
     if is_valid_version_format "$version"; then
-        echo "$version" | command awk -F. '{print $1 "." $2}'
+        printf '%s\n' "$version" | command awk -F. '{print $1 "." $2}'
         return 0
     fi
 
@@ -671,7 +670,7 @@ phpvm_normalize_version() {
 # Returns: 0 if valid, 1 if invalid
 is_valid_version_format() {
     local version="$1"
-    echo "$version" | command grep -qE '^[0-9]+\.[0-9]+(\.[0-9]+)?$'
+    printf '%s\n' "$version" | command grep -qE '^[0-9]+\.[0-9]+(\.[0-9]+)?$'
 }
 
 phpvm_warn_patch_version_once() {
@@ -1120,26 +1119,15 @@ suggest_repository_setup() {
     local major_minor
     local major_version
 
-    suggest_repository_heading() {
-        phpvm_echo ""
-        phpvm_echo "$1"
-        phpvm_echo "$2"
-        phpvm_echo ""
-    }
-
-    suggest_repository_footer() {
-        phpvm_echo ""
-        phpvm_echo "After setting up the repositories, try: phpvm install $1"
-    }
-
     if [ "$PKG_MANAGER" = "dnf" ] || [ "$PKG_MANAGER" = "yum" ]; then
-        if [ "$LINUX_DISTRO" = "fedora" ]; then
-            suggest_repository_heading \
-                "PHP packages not found in default Fedora repositories." \
-                "To install PHP $version, you need to enable Remi's repository:"
+        if [ "$PHPVM_LINUX_DISTRO" = "fedora" ]; then
+            phpvm_echo ""
+            phpvm_echo "PHP packages not found in default Fedora repositories."
+            phpvm_echo "To install PHP $version, you need to enable Remi's repository:"
+            phpvm_echo ""
             phpvm_echo "  # Install Remi's repository"
-            if [ -n "$LINUX_VERSION" ]; then
-                phpvm_echo "  sudo dnf install https://rpms.remirepo.net/fedora/remi-release-$LINUX_VERSION.rpm"
+            if [ -n "$PHPVM_LINUX_VERSION" ]; then
+                phpvm_echo "  sudo dnf install https://rpms.remirepo.net/fedora/remi-release-$PHPVM_LINUX_VERSION.rpm"
             else
                 phpvm_echo "  sudo dnf install https://rpms.remirepo.net/fedora/remi-release-42.rpm"
             fi
@@ -1150,18 +1138,20 @@ suggest_repository_setup() {
             phpvm_echo "  # Enable specific PHP version repository"
             major_minor=$(echo "$version" | cut -d. -f1,2 | tr -d '.')
             phpvm_echo "  sudo dnf config-manager --set-enabled remi-php$major_minor"
-            suggest_repository_footer "$version"
+            phpvm_echo ""
+            phpvm_echo "After setting up the repositories, try: phpvm install $version"
 
-        elif [ "$LINUX_DISTRO" = "rhel" ] || [ "$LINUX_DISTRO" = "rocky" ] || [ "$LINUX_DISTRO" = "almalinux" ] || [ "$LINUX_DISTRO" = "centos" ]; then
-            suggest_repository_heading \
-                "PHP packages not found in default RHEL/CentOS repositories." \
-                "To install PHP $version, you need to enable EPEL and Remi repositories:"
+        elif [ "$PHPVM_LINUX_DISTRO" = "rhel" ] || [ "$PHPVM_LINUX_DISTRO" = "rocky" ] || [ "$PHPVM_LINUX_DISTRO" = "almalinux" ] || [ "$PHPVM_LINUX_DISTRO" = "centos" ]; then
+            phpvm_echo ""
+            phpvm_echo "PHP packages not found in default RHEL/CentOS repositories."
+            phpvm_echo "To install PHP $version, you need to enable EPEL and Remi repositories:"
+            phpvm_echo ""
             phpvm_echo "  # Install EPEL repository"
             phpvm_echo "  sudo dnf install epel-release"
             phpvm_echo ""
             phpvm_echo "  # Install Remi's repository"
-            if [ -n "$LINUX_VERSION" ]; then
-                major_version=$(echo "$LINUX_VERSION" | cut -d. -f1)
+            if [ -n "$PHPVM_LINUX_VERSION" ]; then
+                major_version=$(echo "$PHPVM_LINUX_VERSION" | cut -d. -f1)
                 phpvm_echo "  sudo dnf install https://rpms.remirepo.net/enterprise/remi-release-$major_version.rpm"
             else
                 phpvm_echo "  sudo dnf install https://rpms.remirepo.net/enterprise/remi-release-9.rpm"
@@ -1171,7 +1161,8 @@ suggest_repository_setup() {
             phpvm_echo "  sudo dnf config-manager --set-enabled remi"
             major_minor=$(echo "$version" | cut -d. -f1,2 | tr -d '.')
             phpvm_echo "  sudo dnf config-manager --set-enabled remi-php$major_minor"
-            suggest_repository_footer "$version"
+            phpvm_echo ""
+            phpvm_echo "After setting up the repositories, try: phpvm install $version"
         fi
     fi
 }
@@ -1219,11 +1210,9 @@ brew_unlink_all_php() {
     brew unlink php > /dev/null 2>&1 || true
 
     if formula_list=$(brew list --formula 2> /dev/null); then
-        for php_formula in $(echo "$formula_list" | command grep -E '^php@[0-9]+\.[0-9]+$'); do
-            if [ -n "$php_formula" ]; then
-                phpvm_debug "Unlinking $php_formula..."
-                brew unlink "$php_formula" > /dev/null 2>&1 || true
-            fi
+        printf '%s\n' "$formula_list" | command grep -E '^php@[0-9]+\.[0-9]+$' | while IFS= read -r php_formula; do
+            phpvm_debug "Unlinking $php_formula..."
+            brew unlink "$php_formula" > /dev/null 2>&1 || true
         done
     fi
 }
@@ -1545,9 +1534,9 @@ install_php_yum() {
 
     phpvm_warn_patch_version_once "$version" "$normalized_version"
 
-    if [ "$LINUX_DISTRO" = "rhel" ] || [ "$LINUX_DISTRO" = "centos" ]; then
-        if [ -n "$LINUX_VERSION" ] && [ "$LINUX_VERSION" -lt 8 ]; then
-            phpvm_warn "Installing PHP $normalized_version on RHEL/CentOS $LINUX_VERSION"
+    if [ "$PHPVM_LINUX_DISTRO" = "rhel" ] || [ "$PHPVM_LINUX_DISTRO" = "centos" ]; then
+        if [ -n "$PHPVM_LINUX_VERSION" ] && [ "$PHPVM_LINUX_VERSION" -lt 8 ]; then
+            phpvm_warn "Installing PHP $normalized_version on RHEL/CentOS $PHPVM_LINUX_VERSION"
             phpvm_warn "You may need EPEL and Remi repositories for modern PHP versions"
         fi
     fi
@@ -1604,7 +1593,7 @@ install_php_pacman() {
         phpvm_warn "Failed to sync package databases, continuing anyway..."
     }
 
-    if [ "$LINUX_DISTRO" = "arch" ] || [ "$LINUX_DISTRO" = "manjaro" ]; then
+    if [ "$PHPVM_LINUX_DISTRO" = "arch" ] || [ "$PHPVM_LINUX_DISTRO" = "manjaro" ]; then
         arch_php_version=$(pacman -Si php 2> /dev/null | command grep -E '^Version' | command awk '{print $3}' | command cut -d. -f1,2)
 
         if [ "$version" = "$arch_php_version" ]; then
@@ -1750,9 +1739,9 @@ switch_to_system_php() {
     case "$PKG_MANAGER" in
     brew)
         # Apple removed PHP from macOS starting with macOS Monterey 12.0
-        if [ -n "$MACOS_MAJOR" ] && [ "$MACOS_MAJOR" -ge 12 ]; then
+        if [ -n "$PHPVM_MACOS_MAJOR" ] && [ "$PHPVM_MACOS_MAJOR" -ge 12 ]; then
             if [ -d "$HOMEBREW_PREFIX/Cellar/php" ]; then
-                phpvm_debug "Linking Homebrew php formula as system default (macOS $MACOS_VERSION)..."
+                phpvm_debug "Linking Homebrew php formula as system default (macOS $PHPVM_MACOS_VERSION)..."
                 brew_link_php_unversioned || {
                     phpvm_err "Failed to link Homebrew php formula."
                     return "$PHPVM_EXIT_ERROR"
@@ -1764,7 +1753,7 @@ switch_to_system_php() {
                 return "$PHPVM_EXIT_SUCCESS"
             fi
 
-            phpvm_warn "No system PHP available on macOS $MACOS_VERSION. Installing Homebrew PHP..."
+            phpvm_warn "No system PHP available on macOS $PHPVM_MACOS_VERSION. Installing Homebrew PHP..."
             if brew install php > /dev/null 2>&1; then
                 set_active_version "system" || return "$PHPVM_EXIT_FILE_ERROR"
                 update_current_symlink || true
@@ -1815,7 +1804,7 @@ switch_to_system_php() {
                 phpvm_err "Failed to switch to system PHP version."
                 return "$PHPVM_EXIT_ERROR"
             }
-        elif [ "$LINUX_DISTRO" = "arch" ] || [ "$LINUX_DISTRO" = "manjaro" ]; then
+        elif [ "$PHPVM_LINUX_DISTRO" = "arch" ] || [ "$PHPVM_LINUX_DISTRO" = "manjaro" ]; then
             if [ -x "/usr/bin/php" ]; then
                 phpvm_debug "Using system PHP on Arch Linux"
             else
@@ -1876,7 +1865,7 @@ switch_to_version_php() {
                 phpvm_err "PHP binary for version $normalized_version not found. Tried: /usr/bin/php$normalized_version"
                 return "$PHPVM_EXIT_NOT_INSTALLED"
             fi
-        elif [ "$LINUX_DISTRO" = "arch" ] || [ "$LINUX_DISTRO" = "manjaro" ]; then
+        elif [ "$PHPVM_LINUX_DISTRO" = "arch" ] || [ "$PHPVM_LINUX_DISTRO" = "manjaro" ]; then
             # Arch Linux typically has a single PHP version
             if [ -x "/usr/bin/php" ]; then
                 installed_version=$(php -v 2> /dev/null | awk '/^PHP/ {print $2}' | cut -d. -f1,2)
@@ -1912,7 +1901,7 @@ switch_to_version_php() {
             fi
         else
             phpvm_err "Cannot switch PHP versions on this system. No supported method found."
-            phpvm_warn "System: $LINUX_DISTRO $LINUX_VERSION, Package Manager: $PKG_MANAGER"
+            phpvm_warn "System: $PHPVM_LINUX_DISTRO $PHPVM_LINUX_VERSION, Package Manager: $PKG_MANAGER"
             phpvm_warn "Supported methods: update-alternatives, alternatives, dnf modules, Arch pacman"
             phpvm_warn "Please install one of: update-alternatives (Debian/Ubuntu), alternatives (RHEL/CentOS)"
             return "$PHPVM_EXIT_ERROR"
@@ -2161,7 +2150,7 @@ phpvm_deactivate() {
 find_phpvmrc() {
     local current_dir="$PWD"
     local depth=0
-    local max_depth=25 # Increased for monorepo/deep directory structures
+    local max_depth="${PHPVM_PHPVMRC_MAX_DEPTH:-25}"
 
     while [ "$current_dir" != "/" ] && [ $depth -lt $max_depth ]; do
         if [ -f "$current_dir/.phpvmrc" ]; then
@@ -2418,13 +2407,13 @@ print_system_info() {
     get_os_info
 
     # Basic system info
-    echo "OS Type: $OS_TYPE"
-    echo "Architecture: $OS_ARCH"
+    echo "OS Type: $PHPVM_OS_TYPE"
+    echo "Architecture: $PHPVM_OS_ARCH"
 
-    if [ "$OS_TYPE" = "Darwin" ]; then
-        echo "macOS Version: ${MACOS_VERSION:-Unknown}"
-        echo "macOS Major: ${MACOS_MAJOR:-Unknown}"
-        echo "macOS Minor: ${MACOS_MINOR:-Unknown}"
+    if [ "$PHPVM_OS_TYPE" = "Darwin" ]; then
+        echo "macOS Version: ${PHPVM_MACOS_VERSION:-Unknown}"
+        echo "macOS Major: ${PHPVM_MACOS_MAJOR:-Unknown}"
+        echo "macOS Minor: ${PHPVM_MACOS_MINOR:-Unknown}"
 
         if command -v brew > /dev/null 2>&1; then
             echo "Homebrew: Installed"
@@ -2433,12 +2422,12 @@ print_system_info() {
         else
             echo "Homebrew: Not installed"
         fi
-    elif [ "$OS_TYPE" = "Linux" ]; then
-        echo "Linux Distribution: ${LINUX_DISTRO:-Unknown}"
-        echo "Linux Version: ${LINUX_VERSION:-Unknown}"
-        echo "WSL: ${IS_WSL:-false}"
-        if [ "$IS_WSL" = "true" ]; then
-            echo "WSL Version: ${WSL_VERSION:-Unknown}"
+    elif [ "$PHPVM_OS_TYPE" = "Linux" ]; then
+        echo "Linux Distribution: ${PHPVM_LINUX_DISTRO:-Unknown}"
+        echo "Linux Version: ${PHPVM_LINUX_VERSION:-Unknown}"
+        echo "WSL: ${PHPVM_IS_WSL:-false}"
+        if [ "$PHPVM_IS_WSL" = "true" ]; then
+            echo "WSL Version: ${PHPVM_WSL_VERSION:-Unknown}"
         fi
 
         echo ""
