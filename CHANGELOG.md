@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [v1.9.3](https://github.com/Thavarshan/phpvm/compare/v1.9.2...v1.9.3) - 2026-03-15
+
+### Fixed
+
+- **Fixed ShellCheck SC2086 in `find_phpvmrc`:** Double-quoted `$depth` and `$max_depth` in arithmetic comparison to prevent globbing and word splitting.
+
+### Internal
+
+- **Version bump:** Updated to v1.9.3.
+
 ## [v1.9.2](https://github.com/Thavarshan/phpvm/compare/v1.9.1...v1.9.2) - 2026-03-15
 
 ### Changed

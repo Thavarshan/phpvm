@@ -11,7 +11,7 @@
 
 # shellcheck disable=SC2155  # Allow declare and assign on same line for better readability
 
-PHPVM_VERSION="1.9.2"
+PHPVM_VERSION="1.9.3"
 
 # Test mode flag
 PHPVM_TEST_MODE="${PHPVM_TEST_MODE:-false}"
@@ -2152,7 +2152,7 @@ find_phpvmrc() {
     local depth=0
     local max_depth="${PHPVM_PHPVMRC_MAX_DEPTH:-25}"
 
-    while [ "$current_dir" != "/" ] && [ $depth -lt $max_depth ]; do
+    while [ "$current_dir" != "/" ] && [ "$depth" -lt "$max_depth" ]; do
         if [ -f "$current_dir/.phpvmrc" ]; then
             echo "$current_dir/.phpvmrc"
             return 0
