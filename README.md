@@ -39,6 +39,7 @@ PHP 8.1.13
 - Install and manage multiple PHP versions.
 - Seamlessly switch between installed PHP versions.
 - Auto-switch PHP versions based on project `.phpvmrc` (configurable depth via `PHPVM_PHPVMRC_MAX_DEPTH`).
+- Automatic directory-based switching via built-in cd hook (`PROMPT_COMMAND` for bash, `chpwd` for zsh).
 - Alias management for versions (`phpvm alias`, `phpvm unalias`).
 - Built-in version shortcuts: `latest`, `stable`, and user-defined aliases.
 - Cache directory inspection (`phpvm cache dir`).
@@ -94,24 +95,24 @@ If the installation was successful, it should output the path to `phpvm`.
 
 ### Available Commands
 
-| Command                      | Description                                |
-| ---------------------------- | ------------------------------------------ |
-| `phpvm install <version>`    | Install a specific PHP version             |
-| `phpvm use <version>`        | Switch to a specific PHP version           |
-| `phpvm uninstall <version>`  | Remove a specific PHP version              |
-| `phpvm current`              | Display the currently active PHP version   |
-| `phpvm which [version]`      | Show the path to PHP binary for a version  |
-| `phpvm deactivate`           | Temporarily disable phpvm and restore PATH |
-| `phpvm system`               | Switch to system/Homebrew default PHP      |
-| `phpvm auto`                 | Auto-switch based on `.phpvmrc` file       |
-| `phpvm list` or `phpvm ls`   | List all installed PHP versions            |
-| `phpvm alias [name] [ver]`   | Create, update, or list version aliases    |
-| `phpvm unalias <name>`       | Remove version alias                       |
-| `phpvm cache dir`            | Show phpvm cache directory                 |
-| `phpvm info`                 | Show system information for debugging      |
-| `phpvm version`              | Show version information                   |
-| `phpvm --version` / `-v`     | Show version information (aliases)         |
-| `phpvm help`                 | Show help message                          |
+| Command                     | Description                                |
+| --------------------------- | ------------------------------------------ |
+| `phpvm install [version]`   | Install a PHP version (reads `.phpvmrc` if no version given) |
+| `phpvm use [version]`       | Switch PHP version (reads `.phpvmrc` → default alias if no version given) |
+| `phpvm uninstall <version>` | Remove a specific PHP version              |
+| `phpvm current`             | Display the currently active PHP version   |
+| `phpvm which [version]`     | Show the path to PHP binary for a version  |
+| `phpvm deactivate`          | Temporarily disable phpvm and restore PATH |
+| `phpvm system`              | Switch to system/Homebrew default PHP      |
+| `phpvm auto`                | Auto-switch based on `.phpvmrc` file       |
+| `phpvm list` or `phpvm ls`  | List all installed PHP versions            |
+| `phpvm alias [name] [ver]`  | Create, update, or list version aliases    |
+| `phpvm unalias <name>`      | Remove version alias                       |
+| `phpvm cache dir`           | Show phpvm cache directory                 |
+| `phpvm info`                | Show system information for debugging      |
+| `phpvm version`             | Show version information                   |
+| `phpvm --version` / `-v`    | Show version information (aliases)         |
+| `phpvm help`                | Show help message                          |
 
 ### Installing PHP Versions
 
@@ -197,13 +198,28 @@ Create a `.phpvmrc` file in your project directory to specify the desired PHP ve
 echo "8.1" > .phpvmrc
 ```
 
-When you navigate to that project directory and run:
+**Automatic switching on `cd`**: When phpvm is sourced into your shell, it registers a cd hook that detects `.phpvmrc` files and switches PHP versions automatically as you navigate between directories. No manual command needed — just `cd` into a project.
+
+- **Bash**: Uses `PROMPT_COMMAND`
+- **Zsh**: Uses `chpwd_functions`
+- Gated behind `PHPVM_AUTO_USE=true` (the default)
+- Skips switching if already on the correct version
+
+**Using `use` and `install` without a version**: When no version argument is given, these commands read `.phpvmrc` automatically:
+
+```sh
+# Reads version from .phpvmrc in current or parent directories
+phpvm use
+phpvm install
+```
+
+`phpvm use` follows this fallback chain: `.phpvmrc` → `default` alias → error.
+
+**Manual switching**: You can also trigger auto-switching explicitly:
 
 ```sh
 phpvm auto
 ```
-
-phpvm will automatically detect and switch to the version specified in the `.phpvmrc` file.
 
 Aliases can also be used in `.phpvmrc`:
 
@@ -320,14 +336,14 @@ fi
 
 ## Environment Variables
 
-| Variable | Default | Description |
-| --- | --- | --- |
-| `PHPVM_DIR` | `~/.phpvm` | Installation directory |
-| `PHPVM_AUTO_USE` | `true` | Enable automatic `.phpvmrc` detection when sourced |
-| `PHPVM_PHPVMRC_MAX_DEPTH` | `25` | Max parent directories to traverse when searching for `.phpvmrc` |
-| `DEBUG` | `false` | Enable debug logging with timestamps |
-| `NO_COLOR` | _(unset)_ | Disable color output ([no-color.org](https://no-color.org/)) |
-| `PHPVM_LOG_TIMESTAMPS` | `false` | Always show timestamps in log output |
+| Variable                  | Default    | Description                                                      |
+| ------------------------- | ---------- | ---------------------------------------------------------------- |
+| `PHPVM_DIR`               | `~/.phpvm` | Installation directory                                           |
+| `PHPVM_AUTO_USE`          | `true`     | Enable automatic `.phpvmrc` detection when sourced               |
+| `PHPVM_PHPVMRC_MAX_DEPTH` | `25`       | Max parent directories to traverse when searching for `.phpvmrc` |
+| `DEBUG`                   | `false`    | Enable debug logging with timestamps                             |
+| `NO_COLOR`                | _(unset)_  | Disable color output ([no-color.org](https://no-color.org/))     |
+| `PHPVM_LOG_TIMESTAMPS`    | `false`    | Always show timestamps in log output                             |
 
 ## Uninstallation
 
