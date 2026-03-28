@@ -3047,7 +3047,8 @@ if [ "${BASH_SOURCE[0]}" != "${0}" ]; then
             elif [ -n "${ZSH_VERSION:-}" ]; then
                 # Zsh: add to chpwd_functions array
                 if [[ ! " ${chpwd_functions[*]:-} " =~ " phpvm_cd_hook " ]]; then
-                    chpwd_functions=(phpvm_cd_hook ${chpwd_functions[@]:-})
+                    # shellcheck disable=SC2206  # Intentional: chpwd_functions is a zsh array, word splitting is safe here
+                    chpwd_functions=(phpvm_cd_hook "${chpwd_functions[@]:-}")
                 fi
             fi
         fi
