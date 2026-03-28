@@ -14,7 +14,7 @@
 
 ```sh
 $ phpvm version
-phpvm version 1.9.4
+phpvm version 1.10.0
 
 PHP Version Manager for macOS and Linux
 Author: Jerome Thayananthajothy <tjthavarshan@gmail.com>

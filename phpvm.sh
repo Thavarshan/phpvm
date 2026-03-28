@@ -2,7 +2,7 @@
 
 # phpvm - A PHP Version Manager for macOS and Linux
 # Author: Jerome Thayananthajothy (tjthavarshan@gmail.com)
-# Version: 1.9.1
+# Version: 1.10.0
 #
 # IMPORTANT: This script is written for bash and uses bashisms (arrays, process substitution, etc.)
 # For sourcing into your shell, use bash only. Zsh users should run phpvm via:
@@ -11,7 +11,7 @@
 
 # shellcheck disable=SC2155  # Allow declare and assign on same line for better readability
 
-PHPVM_VERSION="1.9.4"
+PHPVM_VERSION="1.10.0"
 
 # Test mode flag
 PHPVM_TEST_MODE="${PHPVM_TEST_MODE:-false}"
@@ -2163,6 +2163,44 @@ find_phpvmrc() {
     return 1
 }
 
+# Read and resolve PHP version from .phpvmrc in current or parent directories
+# Usage: phpvm_read_phpvmrc_version
+# Returns: resolved version on stdout, 1 if no .phpvmrc found or unreadable
+phpvm_read_phpvmrc_version() {
+    local phpvmrc_file
+    local version
+
+    if ! phpvmrc_file=$(find_phpvmrc); then
+        return 1
+    fi
+
+    if [ ! -r "$phpvmrc_file" ]; then
+        phpvm_debug "Cannot read $phpvmrc_file"
+        return 1
+    fi
+
+    if ! version=$(command tr -d '[:space:]' < "$phpvmrc_file" 2> /dev/null); then
+        phpvm_debug "Failed to read $phpvmrc_file"
+        return 1
+    fi
+
+    # Resolve aliases before validation
+    version=$(phpvm_resolve_version "$version")
+
+    if [ -z "$version" ]; then
+        phpvm_debug "No valid PHP version found in $phpvmrc_file"
+        return 1
+    fi
+
+    if ! validate_php_version "$version"; then
+        phpvm_err "Invalid PHP version format in $phpvmrc_file: $version"
+        return 1
+    fi
+
+    printf '%s\n' "$version"
+    return 0
+}
+
 # Auto-switch PHP version based on .phpvmrc file
 auto_switch_php_version() {
     local phpvmrc_file
@@ -2208,6 +2246,27 @@ auto_switch_php_version() {
     fi
 
     return "$PHPVM_EXIT_SUCCESS"
+}
+
+# cd hook for automatic version switching on directory change
+# Compares .phpvmrc version with active version, switches only if different
+# Silent when no .phpvmrc is found in the directory tree
+phpvm_cd_hook() {
+    local version
+    local current
+
+    if ! version=$(phpvm_read_phpvmrc_version); then
+        return 0
+    fi
+
+    current=$(phpvm_current 2> /dev/null | command tr -d '[:space:]')
+
+    if [ "$version" = "$current" ]; then
+        return 0
+    fi
+
+    phpvm_echo "Auto-switching to PHP $version (from .phpvmrc)"
+    use_php_version "$version" || true
 }
 
 # List configured aliases
@@ -2810,12 +2869,17 @@ main() {
     case "$command" in
     use)
         if [ "$#" -eq 0 ]; then
-            if [ -f "$PHPVM_DIR/alias/default" ]; then
+            local rc_version
+            if rc_version=$(phpvm_read_phpvmrc_version); then
+                phpvm_echo "Found '$rc_version' in .phpvmrc"
+                phpvm_with_lock use_php_version "$rc_version"
+                status=$?
+            elif [ -f "$PHPVM_DIR/alias/default" ]; then
                 phpvm_with_lock use_php_version "default"
                 status=$?
             else
-                phpvm_err "Missing PHP version argument for 'use' command."
-                phpvm_warn "Set a default alias with: phpvm alias default <version>"
+                phpvm_err "No .phpvmrc found and no default alias set."
+                phpvm_warn "Create a .phpvmrc file or set a default: phpvm alias default <version>"
                 status=$PHPVM_EXIT_INVALID_ARG
             fi
         else
@@ -2826,7 +2890,13 @@ main() {
         ;;
     install)
         if [ "$#" -eq 0 ]; then
-            phpvm_err "Missing PHP version argument for 'install' command."
+            local rc_version
+            if rc_version=$(phpvm_read_phpvmrc_version); then
+                phpvm_echo "Found '$rc_version' in .phpvmrc"
+                phpvm_with_lock install_php "$rc_version"
+                exit $?
+            fi
+            phpvm_err "No .phpvmrc found. Specify a PHP version to install."
             exit "$PHPVM_EXIT_INVALID_ARG"
         fi
         phpvm_with_lock install_php "$@"
@@ -2873,10 +2943,22 @@ main() {
         exit "$PHPVM_EXIT_SUCCESS"
         ;;
     exec)
+        if [ "$#" -eq 0 ]; then
+            local rc_version
+            if rc_version=$(phpvm_read_phpvmrc_version); then
+                phpvm_echo "Found '$rc_version' in .phpvmrc"
+            fi
+        fi
         phpvm_exec "$@"
         exit "$?"
         ;;
     run)
+        if [ "$#" -eq 0 ]; then
+            local rc_version
+            if rc_version=$(phpvm_read_phpvmrc_version); then
+                phpvm_echo "Found '$rc_version' in .phpvmrc"
+            fi
+        fi
         phpvm_run "$@"
         exit "$?"
         ;;
@@ -2953,6 +3035,19 @@ if [ "${BASH_SOURCE[0]}" != "${0}" ]; then
             if command -v find_phpvmrc > /dev/null 2>&1 && find_phpvmrc > /dev/null 2>&1; then
                 if command -v auto_switch_php_version > /dev/null 2>&1; then
                     auto_switch_php_version 2> /dev/null || true
+                fi
+            fi
+
+            # Register cd hook for automatic version switching
+            if [ -n "${BASH_VERSION:-}" ]; then
+                # Bash: append to PROMPT_COMMAND
+                if [[ ! "${PROMPT_COMMAND:-}" =~ phpvm_cd_hook ]]; then
+                    PROMPT_COMMAND="phpvm_cd_hook${PROMPT_COMMAND:+;$PROMPT_COMMAND}"
+                fi
+            elif [ -n "${ZSH_VERSION:-}" ]; then
+                # Zsh: add to chpwd_functions array
+                if [[ ! " ${chpwd_functions[*]:-} " =~ " phpvm_cd_hook " ]]; then
+                    chpwd_functions=(phpvm_cd_hook ${chpwd_functions[@]:-})
                 fi
             fi
         fi

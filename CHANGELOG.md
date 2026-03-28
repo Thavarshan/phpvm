@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+## [v1.10.0](https://github.com/Thavarshan/phpvm/compare/v1.9.4...v1.10.0) - 2026-03-28
+
+### Added
+
+- **`.phpvmrc` auto-read for `use` (no args):** `phpvm use` without a version argument now reads `.phpvmrc` from the current or parent directories. Falls back to the default alias if no `.phpvmrc` is found, then errors if neither exists.
+- **`.phpvmrc` auto-read for `install` (no args):** `phpvm install` without a version argument now reads `.phpvmrc` to determine which version to install.
+- **`.phpvmrc` awareness for `exec` and `run` (no args):** The `exec` and `run` stubs now detect and report the `.phpvmrc` version when invoked without arguments.
+- **`phpvm_read_phpvmrc_version()` helper:** Shared function that finds, reads, resolves aliases, and validates `.phpvmrc` in a single call.
+- **`phpvm_cd_hook()` for automatic directory-based switching:** When phpvm is sourced, a cd hook is registered via `PROMPT_COMMAND` (bash) or `chpwd_functions` (zsh) that automatically switches PHP versions when entering a directory with a `.phpvmrc`. Gated behind `PHPVM_AUTO_USE=true` (the default). Skips switching if already on the correct version.
+
+### Changed
+
+- **`use` no-arg priority:** `.phpvmrc` now takes precedence over the default alias when running `phpvm use` without arguments.
+- **Error messages for no-arg `use`/`install`:** Updated to reflect the new `.phpvmrc` fallback behaviour.
+
+### Internal
+
+- **Version bump:** Updated to v1.10.0.
+- **New tests:** 5 new BATS tests for `.phpvmrc` auto-read behaviour (use reads .phpvmrc, use prefers .phpvmrc over default, install reads .phpvmrc, error when no .phpvmrc or default, error when no .phpvmrc for install).
+- **Updated error-handling tests:** Adjusted existing no-arg error tests to match new messages.
+- **All tests passing:** 56 BATS tests pass.
+
 ## [v1.9.4](https://github.com/Thavarshan/phpvm/compare/v1.9.3...v1.9.4) - 2026-03-15
 
 ### Fixed

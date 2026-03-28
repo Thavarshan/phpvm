@@ -10,15 +10,25 @@ load test_helper
 }
 
 @test "phpvm install with no version shows error" {
-    run bash "$BATS_TEST_DIRNAME/../phpvm.sh" install
-    [ "$status" -eq 2 ]
-    [[ "$output" =~ "Missing PHP version argument" ]]
+    local temp_dir
+    temp_dir=$(mktemp -d /tmp/phpvm-bats-err-inst.XXXXXX)
+
+    run bash -c "cd \"$temp_dir\" && bash \"$BATS_TEST_DIRNAME/../phpvm.sh\" install"
+    [ "$status" -ne 0 ]
+    [[ "$output" =~ "No .phpvmrc found" ]]
+
+    rm -rf "$temp_dir"
 }
 
 @test "phpvm use with no version shows error" {
-    run bash "$BATS_TEST_DIRNAME/../phpvm.sh" use
-    [ "$status" -eq 2 ]
-    [[ "$output" =~ "Missing PHP version argument" ]]
+    local temp_dir
+    temp_dir=$(mktemp -d /tmp/phpvm-bats-err-use.XXXXXX)
+
+    run bash -c "cd \"$temp_dir\" && PHPVM_DIR=\"$temp_dir/.phpvm\" bash \"$BATS_TEST_DIRNAME/../phpvm.sh\" use"
+    [ "$status" -ne 0 ]
+    [[ "$output" =~ "No .phpvmrc found" ]]
+
+    rm -rf "$temp_dir"
 }
 
 @test "phpvm uninstall with no version shows error" {

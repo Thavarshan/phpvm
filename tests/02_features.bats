@@ -112,6 +112,72 @@ load test_helper
     rm -rf "$temp_dir"
 }
 
+@test "phpvm use without args reads .phpvmrc" {
+    local temp_dir
+    temp_dir=$(mktemp -d /tmp/phpvm-bats-phpvmrc-use.XXXXXX)
+    mkdir -p "$temp_dir/.phpvm"
+
+    printf '8.2\n' > "$temp_dir/.phpvmrc"
+
+    run bash -c "cd \"$temp_dir\" && PHPVM_DIR=\"$temp_dir/.phpvm\" PHPVM_TEST_MODE=true bash \"$BATS_TEST_DIRNAME/../phpvm.sh\" use"
+    [[ "$output" =~ "8.2" ]]
+    [[ "$output" =~ ".phpvmrc" ]]
+
+    rm -rf "$temp_dir"
+}
+
+@test "phpvm use prefers .phpvmrc over default alias" {
+    local temp_dir
+    temp_dir=$(mktemp -d /tmp/phpvm-bats-phpvmrc-pref.XXXXXX)
+
+    bash -c "PHPVM_DIR=\"$temp_dir/.phpvm\" bash \"$BATS_TEST_DIRNAME/../phpvm.sh\" alias default 8.1"
+    printf '8.3\n' > "$temp_dir/.phpvmrc"
+
+    run bash -c "cd \"$temp_dir\" && PHPVM_DIR=\"$temp_dir/.phpvm\" PHPVM_TEST_MODE=true bash \"$BATS_TEST_DIRNAME/../phpvm.sh\" use"
+    [[ "$output" =~ "8.3" ]]
+    [[ "$output" =~ ".phpvmrc" ]]
+
+    rm -rf "$temp_dir"
+}
+
+@test "phpvm install without args reads .phpvmrc" {
+    local temp_dir
+    temp_dir=$(mktemp -d /tmp/phpvm-bats-phpvmrc-inst.XXXXXX)
+    mkdir -p "$temp_dir/.phpvm"
+
+    printf '8.2\n' > "$temp_dir/.phpvmrc"
+
+    run bash -c "cd \"$temp_dir\" && PHPVM_DIR=\"$temp_dir/.phpvm\" PHPVM_TEST_MODE=true bash \"$BATS_TEST_DIRNAME/../phpvm.sh\" install"
+    [[ "$output" =~ "8.2" ]]
+    [[ "$output" =~ ".phpvmrc" ]]
+
+    rm -rf "$temp_dir"
+}
+
+@test "phpvm use without args and no .phpvmrc or default shows error" {
+    local temp_dir
+    temp_dir=$(mktemp -d /tmp/phpvm-bats-phpvmrc-none.XXXXXX)
+    mkdir -p "$temp_dir/.phpvm"
+
+    run bash -c "cd \"$temp_dir\" && PHPVM_DIR=\"$temp_dir/.phpvm\" PHPVM_TEST_MODE=true bash \"$BATS_TEST_DIRNAME/../phpvm.sh\" use"
+    [ "$status" -ne 0 ]
+    [[ "$output" =~ "No .phpvmrc found" ]]
+
+    rm -rf "$temp_dir"
+}
+
+@test "phpvm install without args and no .phpvmrc shows error" {
+    local temp_dir
+    temp_dir=$(mktemp -d /tmp/phpvm-bats-phpvmrc-noinst.XXXXXX)
+    mkdir -p "$temp_dir/.phpvm"
+
+    run bash -c "cd \"$temp_dir\" && PHPVM_DIR=\"$temp_dir/.phpvm\" PHPVM_TEST_MODE=true bash \"$BATS_TEST_DIRNAME/../phpvm.sh\" install"
+    [ "$status" -ne 0 ]
+    [[ "$output" =~ "No .phpvmrc found" ]]
+
+    rm -rf "$temp_dir"
+}
+
 @test "phpvm cache dir works" {
     run bash "$BATS_TEST_DIRNAME/../phpvm.sh" cache dir
     [ "$status" -eq 0 ]
