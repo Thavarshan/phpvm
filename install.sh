@@ -104,7 +104,7 @@
 
         if [ -n "$PROFILE" ]; then
             # Check if phpvm is already configured in the profile
-            if grep -qF 'PHPVM_DIR' "$PROFILE" 2>/dev/null; then
+            if grep -qF 'PHPVM_DIR' "$PROFILE" 2> /dev/null; then
                 phpvm_echo "phpvm already configured in $PROFILE (skipping)"
             else
                 phpvm_echo "Adding phpvm to $PROFILE"
