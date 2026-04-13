@@ -11,16 +11,17 @@
 
 # shellcheck disable=SC2155  # Allow declare and assign on same line for better readability
 
-PHPVM_VERSION="1.10.0"
+PHPVM_VERSION="1.11.0"
 
 # Test mode flag
 PHPVM_TEST_MODE="${PHPVM_TEST_MODE:-false}"
 
+PHPVM_DIR="${PHPVM_DIR:-${XDG_CONFIG_HOME:+$XDG_CONFIG_HOME/phpvm}}"
 PHPVM_DIR="${PHPVM_DIR:-$HOME/.phpvm}"
 PHPVM_VERSIONS_DIR="$PHPVM_DIR/versions"
 PHPVM_ACTIVE_VERSION_FILE="$PHPVM_DIR/active_version"
 PHPVM_CURRENT_SYMLINK="$PHPVM_DIR/current"
-DEBUG=false # Set to true to enable debug logs
+PHPVM_DEBUG="${PHPVM_DEBUG:-false}" # Set to true to enable debug logs
 PHPVM_LOG_TIMESTAMPS="${PHPVM_LOG_TIMESTAMPS:-false}"
 PHPVM_PATCH_VERSION_WARNING_SHOWN="${PHPVM_PATCH_VERSION_WARNING_SHOWN:-false}"
 
@@ -51,21 +52,21 @@ phpvm_is_test_mode() {
 }
 
 phpvm_test_prefix() {
-    echo "${TEST_PREFIX:-/tmp}"
+    printf '%s\n' "${TEST_PREFIX:-/tmp}"
 }
 
 phpvm_test_cellar_root() {
-    echo "$(phpvm_test_prefix)/opt/homebrew/Cellar"
+    printf '%s\n' "$(phpvm_test_prefix)/opt/homebrew/Cellar"
 }
 
 phpvm_test_php_cellar_dir() {
     local version="$1"
-    echo "$(phpvm_test_cellar_root)/php@${version}"
+    printf '%s\n' "$(phpvm_test_cellar_root)/php@${version}"
 }
 
 phpvm_test_php_bin_dir() {
     local version="$1"
-    echo "$(phpvm_test_php_cellar_dir "$version")/bin"
+    printf '%s\n' "$(phpvm_test_php_cellar_dir "$version")/bin"
 }
 
 phpvm_test_php_installed() {
@@ -115,7 +116,7 @@ EOF
 
 phpvm_test_php_path() {
     local version="$1"
-    echo "$(phpvm_test_php_cellar_dir "$version")/bin/php"
+    printf '%s\n' "$(phpvm_test_php_cellar_dir "$version")/bin/php"
 }
 
 # State helpers
@@ -209,15 +210,15 @@ phpvm_has_colors() {
 # Initialize ANSI color codes based on terminal support
 phpvm_init_colors() {
     if phpvm_has_colors; then
-        RED=$(printf '\033[31m')
-        GREEN=$(printf '\033[32m')
-        YELLOW=$(printf '\033[33m')
-        RESET=$(printf '\033[0m')
+        PHPVM_RED=$(printf '\033[31m')
+        PHPVM_GREEN=$(printf '\033[32m')
+        PHPVM_YELLOW=$(printf '\033[33m')
+        PHPVM_RESET=$(printf '\033[0m')
     else
-        RED=''
-        GREEN=''
-        YELLOW=''
-        RESET=''
+        PHPVM_RED=''
+        PHPVM_GREEN=''
+        PHPVM_YELLOW=''
+        PHPVM_RESET=''
     fi
 }
 
@@ -231,16 +232,16 @@ phpvm_log() {
     local color_prefix=""
     local color_suffix=""
 
-    if [ -n "${RESET:-}" ]; then
+    if [ -n "${PHPVM_RESET:-}" ]; then
         case "$level" in
-        ERROR) color_prefix="${RED}" ;;
-        WARNING) color_prefix="${YELLOW}" ;;
-        INFO) color_prefix="${GREEN}" ;;
+        ERROR) color_prefix="${PHPVM_RED}" ;;
+        WARNING) color_prefix="${PHPVM_YELLOW}" ;;
+        INFO) color_prefix="${PHPVM_GREEN}" ;;
         esac
-        color_suffix="${RESET}"
+        color_suffix="${PHPVM_RESET}"
     fi
 
-    if [ "$DEBUG" = "true" ] || [ "$PHPVM_LOG_TIMESTAMPS" = "true" ]; then
+    if [ "$PHPVM_DEBUG" = "true" ] || [ "$PHPVM_LOG_TIMESTAMPS" = "true" ]; then
         log_with_timestamp "$level" "${color_prefix}$*${color_suffix}"
     else
         printf "%s\n" "${color_prefix}$*${color_suffix}"
@@ -250,7 +251,7 @@ phpvm_log() {
 phpvm_echo() { phpvm_log "INFO" "$*"; }
 phpvm_err() { phpvm_log "ERROR" "$*" >&2; }
 phpvm_warn() { phpvm_log "WARNING" "$*" >&2; }
-phpvm_debug() { if [ "$DEBUG" = "true" ]; then log_with_timestamp "DEBUG" "$*"; fi; }
+phpvm_debug() { if [ "$PHPVM_DEBUG" = "true" ]; then log_with_timestamp "DEBUG" "$*"; fi; }
 
 # Atomic file write - writes to temp file then moves to target
 # This prevents race conditions and partial writes
@@ -681,7 +682,6 @@ phpvm_warn_patch_version_once() {
         if [ "${PHPVM_PATCH_VERSION_WARNING_SHOWN:-false}" != "true" ]; then
             phpvm_warn "Using $normalized_version for package operations."
             PHPVM_PATCH_VERSION_WARNING_SHOWN=true
-            export PHPVM_PATCH_VERSION_WARNING_SHOWN
         fi
     fi
 }
@@ -1006,7 +1006,7 @@ phpvm_resolve_version() {
     # Resolve special keywords
     if [ "$input" = "latest" ] || [ "$input" = "stable" ]; then
         if resolved=$(phpvm_get_latest_installed_version); then
-            echo "$resolved"
+            printf '%s\n' "$resolved"
             return 0
         else
             # No installed versions found - provide clear guidance
@@ -1022,13 +1022,13 @@ phpvm_resolve_version() {
         resolved=$(command cat "$PHPVM_DIR/alias/$input" 2> /dev/null | command tr -d '[:space:]')
         if [ -n "$resolved" ]; then
             phpvm_debug "Resolved alias '$input' to version '$resolved'"
-            echo "$resolved"
+            printf '%s\n' "$resolved"
             return 0
         fi
     fi
 
     # No alias found, return input as-is
-    echo "$input"
+    printf '%s\n' "$input"
     return 0
 }
 
@@ -1085,7 +1085,7 @@ phpvm_get_latest_installed_version() {
 
     latest=$(printf '%s\n' "${versions[@]}" | phpvm_latest_from_list)
     if [ -n "$latest" ]; then
-        echo "$latest"
+        printf '%s\n' "$latest"
         return 0
     fi
 
@@ -1096,9 +1096,9 @@ phpvm_get_latest_installed_version() {
 check_remi_repository() {
     # Check if Remi repository is installed
     if command_exists dnf; then
-        dnf repolist enabled 2> /dev/null | grep -q remi
+        dnf repolist enabled 2> /dev/null | command grep -q remi
     elif command_exists yum; then
-        yum repolist enabled 2> /dev/null | grep -q remi
+        yum repolist enabled 2> /dev/null | command grep -q remi
     else
         return 1
     fi
@@ -1381,6 +1381,14 @@ install_php() {
     if phpvm_is_test_mode; then
         phpvm_test_install_php "$normalized_version"
         phpvm_echo "PHP $normalized_version installed."
+
+        # Auto-set 'default' alias on first install (matches nvm behaviour)
+        if [ ! -f "$PHPVM_DIR/alias/default" ]; then
+            if phpvm_atomic_write "$PHPVM_DIR/alias/default" "$normalized_version"; then
+                phpvm_echo "Alias 'default' set to PHP $normalized_version (first install)"
+            fi
+        fi
+
         return "$PHPVM_EXIT_SUCCESS"
     fi
 
@@ -1409,6 +1417,14 @@ install_php() {
     esac
 
     phpvm_echo "PHP $normalized_version installed."
+
+    # Auto-set 'default' alias on first install (matches nvm behaviour)
+    if [ ! -f "$PHPVM_DIR/alias/default" ]; then
+        if phpvm_atomic_write "$PHPVM_DIR/alias/default" "$normalized_version"; then
+            phpvm_echo "Alias 'default' set to PHP $normalized_version (first install)"
+        fi
+    fi
+
     return "$PHPVM_EXIT_SUCCESS"
 }
 
@@ -1675,6 +1691,10 @@ use_php_version() {
     local version="$1"
     local normalized_version
 
+    # Invalidate command availability cache so post-switch queries are fresh
+    PHPVM_CACHE_PHP_CONFIG=""
+    PHPVM_CACHE_PHP=""
+
     [ -z "$version" ] && {
         phpvm_err "No PHP version specified to switch."
         return "$PHPVM_EXIT_INVALID_ARG"
@@ -1749,24 +1769,22 @@ switch_to_system_php() {
                 # Only set state AFTER successful switch
                 set_active_version "system" || return "$PHPVM_EXIT_FILE_ERROR"
                 update_current_symlink || true
+                command hash -r 2> /dev/null || true
+                export PHPVM_BIN="${HOMEBREW_PREFIX}/bin"
                 phpvm_echo "Switched to system PHP (Homebrew default)."
                 return "$PHPVM_EXIT_SUCCESS"
             fi
 
-            phpvm_warn "No system PHP available on macOS $PHPVM_MACOS_VERSION. Installing Homebrew PHP..."
-            if brew install php > /dev/null 2>&1; then
-                set_active_version "system" || return "$PHPVM_EXIT_FILE_ERROR"
-                update_current_symlink || true
-                phpvm_echo "Installed and switched to system PHP (Homebrew)."
-                return "$PHPVM_EXIT_SUCCESS"
-            fi
-            phpvm_err "Failed to install system PHP via Homebrew."
-            return "$PHPVM_EXIT_ERROR"
+            phpvm_err "No system PHP available on macOS $PHPVM_MACOS_VERSION."
+            phpvm_warn "Install PHP first with: brew install php"
+            return "$PHPVM_EXIT_NOT_INSTALLED"
         fi
 
         if [ -x "/usr/bin/php" ]; then
             set_active_version "system" || return "$PHPVM_EXIT_FILE_ERROR"
             update_current_symlink || true
+            command hash -r 2> /dev/null || true
+            export PHPVM_BIN="/usr/bin"
             phpvm_echo "Switched to system PHP (built-in macOS PHP)."
             return "$PHPVM_EXIT_SUCCESS"
         elif [ -d "$HOMEBREW_PREFIX/Cellar/php" ]; then
@@ -1777,11 +1795,19 @@ switch_to_system_php() {
             }
             set_active_version "system" || return "$PHPVM_EXIT_FILE_ERROR"
             update_current_symlink || true
+            command hash -r 2> /dev/null || true
+            export PHPVM_BIN="${HOMEBREW_PREFIX}/bin"
             phpvm_echo "Switched to system PHP (Homebrew default)."
             return "$PHPVM_EXIT_SUCCESS"
         elif command_exists php; then
             set_active_version "system" || return "$PHPVM_EXIT_FILE_ERROR"
             update_current_symlink || true
+            command hash -r 2> /dev/null || true
+            local sys_php_dir
+            sys_php_dir=$(dirname "$(command -v php 2> /dev/null)" 2> /dev/null) || true
+            if [ -n "$sys_php_dir" ]; then
+                export PHPVM_BIN="$sys_php_dir"
+            fi
             phpvm_echo "Switched to system PHP."
             return "$PHPVM_EXIT_SUCCESS"
         fi
@@ -1789,6 +1815,8 @@ switch_to_system_php() {
         # No system PHP found - still set state but warn user
         set_active_version "system" || return "$PHPVM_EXIT_FILE_ERROR"
         update_current_symlink || true
+        command hash -r 2> /dev/null || true
+        unset PHPVM_BIN
         phpvm_echo "Switched to system PHP."
         phpvm_warn "No system PHP found. You may need to install PHP with 'brew install php' or switch to a specific version."
         return "$PHPVM_EXIT_SUCCESS"
@@ -1813,6 +1841,14 @@ switch_to_system_php() {
         fi
         set_active_version "system" || return "$PHPVM_EXIT_FILE_ERROR"
         update_current_symlink || true
+        command hash -r 2> /dev/null || true
+        local sys_php_dir
+        sys_php_dir=$(dirname "$(command -v php 2> /dev/null)" 2> /dev/null) || true
+        if [ -n "$sys_php_dir" ]; then
+            export PHPVM_BIN="$sys_php_dir"
+        else
+            unset PHPVM_BIN
+        fi
         phpvm_echo "Switched to system PHP."
         return "$PHPVM_EXIT_SUCCESS"
         ;;
@@ -1914,6 +1950,16 @@ switch_to_version_php() {
 
     set_active_version "$normalized_version" || return "$PHPVM_EXIT_FILE_ERROR"
 
+    # Flush bash command path cache so 'php' resolves to the new binary immediately
+    command hash -r 2> /dev/null || true
+
+    # Export PHPVM_BIN so scripts and IDEs can discover the active PHP bin directory
+    local php_bin_dir
+    php_bin_dir=$(dirname "$(get_php_binary_path "$normalized_version")" 2> /dev/null) || true
+    if [ -n "$php_bin_dir" ]; then
+        export PHPVM_BIN="$php_bin_dir"
+    fi
+
     phpvm_echo "Switched to PHP $normalized_version."
     return "$PHPVM_EXIT_SUCCESS"
 }
@@ -1938,7 +1984,7 @@ phpvm_current() {
 
     # If we have an active version from the file, use it
     if [ -n "$active_version" ]; then
-        echo "$active_version"
+        printf '%s\n' "$active_version"
         return "$PHPVM_EXIT_SUCCESS"
     fi
 
@@ -1953,10 +1999,10 @@ phpvm_current() {
                 # Treat anything under PHPVM_DIR or HOMEBREW_PREFIX as managed
                 case "$php_path" in
                 "$PHPVM_DIR"/* | "$HOMEBREW_PREFIX"/*)
-                    echo "$php_version"
+                    printf '%s\n' "$php_version"
                     ;;
                 *)
-                    echo "system"
+                    printf '%s\n' "system"
                     ;;
                 esac
                 return "$PHPVM_EXIT_SUCCESS"
@@ -1965,7 +2011,7 @@ phpvm_current() {
     fi
 
     # No PHP found
-    echo "none"
+    printf '%s\n' "none"
     return "$PHPVM_EXIT_NOT_INSTALLED"
 }
 
@@ -2136,8 +2182,12 @@ phpvm_deactivate() {
         phpvm_debug "Removed current symlink"
     fi
 
+    # Flush bash command path cache after PATH restore
+    command hash -r 2> /dev/null || true
+
     # Clear phpvm state variables
     unset PHPVM_ACTIVE_VERSION
+    unset PHPVM_BIN
 
     if [ "$silent" != "true" ]; then
         phpvm_echo "phpvm deactivated. Run 'phpvm use <version>' to reactivate."
@@ -2311,7 +2361,17 @@ list_installed_versions() {
     local dir
     local base_name
     local version
-    local active_version
+    local active_version=""
+    local default_alias=""
+    local marker
+
+    # Read active version and default alias for annotations
+    if [ -f "$PHPVM_ACTIVE_VERSION_FILE" ]; then
+        active_version=$(command cat "$PHPVM_ACTIVE_VERSION_FILE" 2> /dev/null | command tr -d '[:space:]')
+    fi
+    if [ -f "$PHPVM_DIR/alias/default" ]; then
+        default_alias=$(command cat "$PHPVM_DIR/alias/default" 2> /dev/null | command tr -d '[:space:]')
+    fi
 
     phpvm_echo "Installed PHP versions:"
 
@@ -2321,18 +2381,37 @@ list_installed_versions() {
             if [ -d "$dir" ]; then
                 base_name=$(basename "$dir")
                 if [ "$base_name" = "php" ]; then
-                    echo "  8.0.0 (latest)"
+                    version="8.0.0"
                 else
-                    # Extract version from php@X.Y format
                     version=${base_name#php@}
-                    echo "  $version"
+                fi
+                marker="  "
+                if [ "$version" = "$active_version" ]; then
+                    marker="->"
+                fi
+                local annotation=""
+                if [ "$version" = "$default_alias" ]; then
+                    annotation=" (default)"
+                fi
+                if [ "$marker" = "->" ]; then
+                    printf '%s %s%s%s%s\n' "$marker" "${PHPVM_GREEN}" "$version" "${PHPVM_RESET}" "$annotation"
+                else
+                    printf '%s %s%s\n' "$marker" "$version" "$annotation"
                 fi
             fi
         done
-        echo "  system (Homebrew default PHP)"
+        # System entry
+        marker="  "
+        if [ "$active_version" = "system" ]; then
+            marker="->"
+        fi
+        if [ "$marker" = "->" ]; then
+            printf '%s %s%s%s\n' "$marker" "${PHPVM_GREEN}" "system" "${PHPVM_RESET}"
+        else
+            printf '%s %s\n' "$marker" "system"
+        fi
         echo ""
-        if [ -f "$PHPVM_ACTIVE_VERSION_FILE" ]; then
-            active_version=$(command cat "$PHPVM_ACTIVE_VERSION_FILE")
+        if [ -n "$active_version" ]; then
             phpvm_echo "Active version: $active_version"
         else
             phpvm_warn "No active PHP version set."
@@ -2348,30 +2427,65 @@ list_installed_versions() {
                     base_name=$(basename "$dir")
                     if [ "$base_name" = "php" ]; then
                         version=$(get_installed_php_version)
-                        echo "  $version (latest)"
                     else
-                        # Extract version from php@X.Y format
                         version=${base_name#php@}
-                        echo "  $version"
+                    fi
+                    marker="  "
+                    if [ "$version" = "$active_version" ]; then
+                        marker="->"
+                    fi
+                    local annotation=""
+                    if [ "$version" = "$default_alias" ]; then
+                        annotation=" (default)"
+                    fi
+                    if [ "$marker" = "->" ]; then
+                        printf '%s %s%s%s%s\n' "$marker" "${PHPVM_GREEN}" "$version" "${PHPVM_RESET}" "$annotation"
+                    else
+                        printf '%s %s%s\n' "$marker" "$version" "$annotation"
                     fi
                 fi
             done
         fi
-        echo "  system (Homebrew default PHP)"
+        marker="  "
+        if [ "$active_version" = "system" ]; then
+            marker="->"
+        fi
+        if [ "$marker" = "->" ]; then
+            printf '%s %s%s%s\n' "$marker" "${PHPVM_GREEN}" "system" "${PHPVM_RESET}"
+        else
+            printf '%s %s\n' "$marker" "system"
+        fi
         ;;
     apt | dnf | yum | pacman)
-        # Use phpvm_linux_installed_versions for accurate binary detection
-        # This scans actual /usr/bin/php* binaries and extracts versions
         phpvm_linux_installed_versions | while IFS= read -r ver; do
-            echo "  $ver"
+            marker="  "
+            if [ "$ver" = "$active_version" ]; then
+                marker="->"
+            fi
+            local annotation=""
+            if [ "$ver" = "$default_alias" ]; then
+                annotation=" (default)"
+            fi
+            if [ "$marker" = "->" ]; then
+                printf '%s %s%s%s%s\n' "$marker" "${PHPVM_GREEN}" "$ver" "${PHPVM_RESET}" "$annotation"
+            else
+                printf '%s %s%s\n' "$marker" "$ver" "$annotation"
+            fi
         done
-        echo "  system (default system PHP)"
+        marker="  "
+        if [ "$active_version" = "system" ]; then
+            marker="->"
+        fi
+        if [ "$marker" = "->" ]; then
+            printf '%s %s%s%s\n' "$marker" "${PHPVM_GREEN}" "system" "${PHPVM_RESET}"
+        else
+            printf '%s %s\n' "$marker" "system"
+        fi
         ;;
     esac
 
     echo ""
-    if [ -f "$PHPVM_ACTIVE_VERSION_FILE" ]; then
-        active_version=$(command cat "$PHPVM_ACTIVE_VERSION_FILE")
+    if [ -n "$active_version" ]; then
         phpvm_echo "Active version: $active_version"
     else
         phpvm_warn "No active PHP version set."
@@ -2397,12 +2511,18 @@ Usage:
   phpvm uninstall <version> Remove specified PHP version
   phpvm current             Show currently active PHP version
   phpvm which [version]     Show path to PHP binary
+  phpvm exec <ver> <cmd>    Execute command with specific PHP version
+  phpvm run <ver> [script]  Run PHP script with specific version
   phpvm deactivate          Temporarily disable phpvm management
+  phpvm unload              Remove phpvm from current shell session
   phpvm system              Switch to system PHP version
   phpvm auto                Auto-switch based on .phpvmrc file
   phpvm list                List installed PHP versions
+  phpvm ls-remote [pattern] List available remote PHP versions
+  phpvm resolve <version>   Resolve version descriptor to installed version
   phpvm alias [name] [ver]  Create, update, or list version aliases
   phpvm unalias <name>      Remove version alias
+  phpvm cache <dir|clear>   Manage cache directory
   phpvm help                Show this help message
   phpvm info                Show system information for debugging
   phpvm version             Show version information
@@ -2423,15 +2543,14 @@ Examples:
   phpvm current             Show current PHP version
   phpvm which               Show path to current PHP binary
   phpvm which 8.2           Show path to PHP 8.2 binary
+  phpvm exec 8.2 composer install  Run composer with PHP 8.2
+  phpvm run 8.1 script.php  Run script with PHP 8.1
   phpvm deactivate          Disable phpvm, restore original PATH
+  phpvm unload              Remove phpvm functions from shell
   phpvm system              Switch to system PHP version
   phpvm auto                Auto-switch based on current directory
-
-Planned Features (Coming Soon):
-  phpvm exec <ver> <cmd>    Execute command with specific PHP version (Phase 1)
-  phpvm run <ver> [script]  Run PHP script with specific version (Phase 1)
-  phpvm ls-remote [pattern] List available remote PHP versions (Phase 2)
-  phpvm cache <dir|clear>   Manage cache directory (Phase 1)
+  phpvm ls-remote           List PHP versions available for install
+  phpvm resolve default     Show which version 'default' alias points to
 
 Exit Codes:
   0   Success
@@ -2531,7 +2650,7 @@ print_system_info() {
 
     echo ""
     echo "Environment Variables:"
-    echo "DEBUG: ${DEBUG:-false}"
+    echo "PHPVM_DEBUG: ${PHPVM_DEBUG:-false}"
     echo "PHPVM_TEST_MODE: ${PHPVM_TEST_MODE:-false}"
     echo "PHPVM_AUTO_USE: ${PHPVM_AUTO_USE:-true}"
 }
@@ -2592,8 +2711,15 @@ uninstall_php() {
             ;;
         esac
         # Safely remove mock directory only if it's in our test prefix
-        if [ -n "$mock_dir" ] && [ "$mock_dir" != "/" ] && echo "$mock_dir" | grep -q "^$test_prefix"; then
-            rm -rf "$mock_dir"
+        if [ -n "$mock_dir" ] && [ "$mock_dir" != "/" ]; then
+            case "$mock_dir" in
+            "$test_prefix"/*)
+                rm -rf "$mock_dir"
+                ;;
+            *)
+                phpvm_warn "Mock directory not under test prefix, skipping removal: $mock_dir"
+                ;;
+            esac
         fi
         phpvm_echo "PHP $normalized_version uninstalled."
         return "$PHPVM_EXIT_SUCCESS"
@@ -2659,34 +2785,197 @@ uninstall_php() {
 # See NVM_FEATURE_GAPS.md for detailed implementation guidance
 # ============================================================================
 
-# Placeholder: Execute command with specific PHP version (HIGH PRIORITY - Phase 1)
+# Execute command with specific PHP version without globally switching
 # Usage: phpvm_exec <version> <command> [args...]
 # Example: phpvm exec 8.2 composer install
 phpvm_exec() {
-    phpvm_err "The 'exec' command is not yet implemented."
-    phpvm_warn "This feature is planned for Phase 1 of the NVM parity roadmap."
-    phpvm_warn "Usage: phpvm exec <version> <command> [args...]"
-    return $PHPVM_EXIT_ERROR
+    local version="$1"
+    local normalized_version
+    local php_bin_dir
+
+    if [ -z "$version" ]; then
+        phpvm_err "Missing version argument."
+        phpvm_warn "Usage: phpvm exec <version> <command> [args...]"
+        return "$PHPVM_EXIT_INVALID_ARG"
+    fi
+    shift
+
+    if [ "$#" -eq 0 ]; then
+        phpvm_err "Missing command to execute."
+        phpvm_warn "Usage: phpvm exec <version> <command> [args...]"
+        return "$PHPVM_EXIT_INVALID_ARG"
+    fi
+
+    # Resolve aliases to actual versions
+    if ! version=$(phpvm_resolve_version "$version"); then
+        return $?
+    fi
+
+    if ! validate_php_version "$version"; then
+        phpvm_err "Invalid PHP version format: $version"
+        return "$PHPVM_EXIT_INVALID_ARG"
+    fi
+
+    if [ "$version" = "system" ]; then
+        # For system, just run the command directly
+        "$@"
+        return $?
+    fi
+
+    normalized_version=$(phpvm_normalize_version "$version") || {
+        phpvm_err "Invalid PHP version format: $version"
+        return "$PHPVM_EXIT_INVALID_ARG"
+    }
+
+    # In test mode, use mock paths
+    if phpvm_is_test_mode; then
+        if ! phpvm_test_php_installed "$normalized_version"; then
+            phpvm_err "PHP version $normalized_version is not installed."
+            return "$PHPVM_EXIT_NOT_INSTALLED"
+        fi
+        php_bin_dir=$(phpvm_test_php_bin_dir "$normalized_version")
+    else
+        local php_binary
+        php_binary=$(get_php_binary_path "$normalized_version")
+        if [ -z "$php_binary" ] || [ ! -x "$php_binary" ]; then
+            phpvm_err "PHP version $normalized_version is not installed."
+            phpvm_warn "Install with: phpvm install $normalized_version"
+            return "$PHPVM_EXIT_NOT_INSTALLED"
+        fi
+        php_bin_dir=$(dirname "$php_binary")
+    fi
+
+    # Execute in subshell to isolate PATH changes from the current shell
+    (
+        export PATH="$php_bin_dir:$PATH"
+        command hash -r 2> /dev/null || true
+        exec "$@"
+    )
+    return $?
 }
 
-# Placeholder: Run PHP script with specific version (HIGH PRIORITY - Phase 1)
+# Run PHP script with specific version
 # Usage: phpvm_run <version> [script] [args...]
 # Example: phpvm run 8.1 script.php arg1 arg2
 phpvm_run() {
-    phpvm_err "The 'run' command is not yet implemented."
-    phpvm_warn "This feature is planned for Phase 1 of the NVM parity roadmap."
-    phpvm_warn "Usage: phpvm run <version> [script] [args...]"
-    return $PHPVM_EXIT_ERROR
+    local version="$1"
+
+    if [ -z "$version" ]; then
+        phpvm_err "Missing version argument."
+        phpvm_warn "Usage: phpvm run <version> [script] [args...]"
+        return "$PHPVM_EXIT_INVALID_ARG"
+    fi
+    shift
+
+    # Sugar: prepend 'php' to the command and delegate to exec
+    phpvm_exec "$version" php "$@"
+    return $?
 }
 
-# Placeholder: List available remote PHP versions (HIGH PRIORITY - Phase 2)
+# List available remote PHP versions from package manager repositories
 # Usage: phpvm_ls_remote [pattern]
 # Example: phpvm ls-remote 8.2
 phpvm_ls_remote() {
-    phpvm_err "The 'ls-remote' command is not yet implemented."
-    phpvm_warn "This feature is planned for Phase 2 of the NVM parity roadmap."
-    phpvm_warn "Usage: phpvm ls-remote [pattern]"
-    return $PHPVM_EXIT_ERROR
+    local pattern="${1:-}"
+    local versions=""
+
+    # In test mode, return a hardcoded list for testing
+    if phpvm_is_test_mode; then
+        versions="7.4
+8.0
+8.1
+8.2
+8.3
+8.4"
+        if [ -n "$pattern" ]; then
+            versions=$(printf '%s\n' "$versions" | command grep -F "$pattern")
+        fi
+        if [ -z "$versions" ]; then
+            phpvm_warn "No PHP versions found matching '$pattern'."
+            return "$PHPVM_EXIT_NOT_FOUND"
+        fi
+        phpvm_echo "Available remote PHP versions:"
+        printf '%s\n' "$versions" | while IFS= read -r v; do
+            printf '  %s\n' "$v"
+        done
+        return "$PHPVM_EXIT_SUCCESS"
+    fi
+
+    phpvm_echo "Querying available PHP versions from $PKG_MANAGER..."
+
+    case "$PKG_MANAGER" in
+    brew)
+        # List all php formulae from Homebrew
+        versions=$(
+            brew formulae 2> /dev/null | command grep -E '^php(@[0-9]+\.[0-9]+)?$' | while IFS= read -r formula; do
+                case "$formula" in
+                php) printf '%s\n' "$(brew_php_major_minor 2> /dev/null || printf '%s\n' 'latest')" ;;
+                php@*) printf '%s\n' "${formula#php@}" ;;
+                esac
+            done | command sort -t. -k1,1n -k2,2n
+        )
+        ;;
+    apt)
+        # List PHP versions available from apt repositories
+        versions=$(
+            apt-cache search '^php[0-9]' 2> /dev/null |
+                command grep -oE 'php[0-9]+\.[0-9]+-cli' |
+                command sed 's/php//;s/-cli//' |
+                command sort -t. -k1,1n -k2,2n -u
+        )
+        ;;
+    dnf)
+        # List PHP module streams available via dnf
+        versions=$(
+            dnf module list php 2> /dev/null |
+                command grep -oE '[0-9]+\.[0-9]+' |
+                command sort -t. -k1,1n -k2,2n -u
+        )
+        ;;
+    yum)
+        # List Remi PHP packages available via yum
+        versions=$(
+            yum list available 'php*-cli' 2> /dev/null |
+                command grep -oE 'php[0-9]+-php-cli' |
+                command sed 's/php//;s/-php-cli//' |
+                command sed 's/\([0-9]\)\([0-9]\)/\1.\2/' |
+                command sort -t. -k1,1n -k2,2n -u
+        )
+        ;;
+    pacman)
+        # List PHP packages available via pacman
+        versions=$(
+            pacman -Ss '^php' 2> /dev/null |
+                command grep -oE 'php[0-9]*\s+[0-9]+\.[0-9]+' |
+                command grep -oE '[0-9]+\.[0-9]+' |
+                command sort -t. -k1,1n -k2,2n -u
+        )
+        ;;
+    *)
+        phpvm_err "ls-remote is not supported for package manager: $PKG_MANAGER"
+        return "$PHPVM_EXIT_ERROR"
+        ;;
+    esac
+
+    # Apply pattern filter if given
+    if [ -n "$pattern" ] && [ -n "$versions" ]; then
+        versions=$(printf '%s\n' "$versions" | command grep -F "$pattern")
+    fi
+
+    if [ -z "$versions" ]; then
+        if [ -n "$pattern" ]; then
+            phpvm_warn "No PHP versions found matching '$pattern'."
+        else
+            phpvm_warn "No PHP versions found in $PKG_MANAGER repositories."
+        fi
+        return "$PHPVM_EXIT_NOT_FOUND"
+    fi
+
+    phpvm_echo "Available remote PHP versions:"
+    printf '%s\n' "$versions" | while IFS= read -r v; do
+        printf '  %s\n' "$v"
+    done
+    return "$PHPVM_EXIT_SUCCESS"
 }
 
 # Validate alias name format
@@ -2819,9 +3108,13 @@ phpvm_cache() {
         return 0
         ;;
     clear)
-        phpvm_err "The 'cache clear' command is not yet implemented."
-        phpvm_warn "This feature is planned for Phase 1 of the NVM parity roadmap."
-        return $PHPVM_EXIT_ERROR
+        if [ -d "$PHPVM_DIR/cache" ]; then
+            rm -rf "${PHPVM_DIR:?}/cache"/*
+            phpvm_echo "Cache cleared."
+        else
+            phpvm_echo "Cache directory does not exist. Nothing to clear."
+        fi
+        return "$PHPVM_EXIT_SUCCESS"
         ;;
     *)
         phpvm_err "Unknown cache subcommand: $subcmd"
@@ -2834,6 +3127,112 @@ phpvm_cache() {
 # ============================================================================
 # END FEATURE PLACEHOLDERS
 # ============================================================================
+
+# Unload phpvm from the current shell session (opposite of sourcing)
+# Removes all phpvm functions, variables, and hooks
+# Usage: phpvm unload
+phpvm_unload() {
+    # Deactivate silently first (restore PATH, clear state files)
+    phpvm_deactivate true
+
+    # Remove cd hook from PROMPT_COMMAND (Bash)
+    if [ -n "${BASH_VERSION:-}" ] && [ -n "${PROMPT_COMMAND:-}" ]; then
+        PROMPT_COMMAND=$(printf '%s\n' "$PROMPT_COMMAND" | command sed 's/phpvm_cd_hook;//g;s/phpvm_cd_hook//g')
+    fi
+
+    # Remove cd hook from chpwd_functions (Zsh)
+    if [ -n "${ZSH_VERSION:-}" ]; then
+        # shellcheck disable=SC2206  # Intentional: chpwd_functions is a zsh array
+        local new_funcs=()
+        local fn
+        for fn in "${chpwd_functions[@]:-}"; do
+            if [ "$fn" != "phpvm_cd_hook" ]; then
+                new_funcs+=("$fn")
+            fi
+        done
+        chpwd_functions=("${new_funcs[@]}")
+    fi
+
+    # Unset all phpvm functions
+    local func_name
+    while IFS= read -r func_name; do
+        unset -f "$func_name" 2> /dev/null
+    done < <(declare -F | command awk '{print $3}' | command grep -E '^(phpvm_|phpvm$|main$|command_exists$|run_with_sudo$|log_with_timestamp$|set_active_version$|update_current_symlink$|create_directories$|ensure_phpvm_dirs$|detect_system$|get_os_info$|sanitize_input$|is_valid_version_format$|validate_php_version$|get_php_package_name$|get_php_binary_path$|is_php_package_installed$|pkg_install_php$|pkg_uninstall_php$|pkg_search_php$|brew_|linux_|install_php|uninstall_php$|use_php_version$|switch_to_|system_php_version$|list_installed_versions$|print_help$|print_version$|print_system_info$|find_phpvmrc$|auto_switch_php_version$|check_remi_repository$|detect_php_availability$|suggest_repository_setup$|get_installed_php_version$)')
+
+    # Unset all PHPVM_ variables
+    local var_name
+    while IFS= read -r var_name; do
+        unset "$var_name" 2> /dev/null
+    done < <(compgen -v | command grep '^PHPVM_')
+
+    # Unset package manager variables set by detect_system
+    unset PKG_MANAGER HOMEBREW_PREFIX PHP_BIN_PATH 2> /dev/null
+
+    phpvm_echo "phpvm unloaded from this shell session." 2> /dev/null || true
+    return 0
+}
+
+# Resolve a version descriptor to a locally installed version number
+# Usage: phpvm_resolve_to_installed <descriptor>
+# Example: phpvm resolve 8.2 → 8.2, phpvm resolve default → 8.2
+phpvm_resolve_to_installed() {
+    local input="$1"
+    local version
+    local normalized_version
+
+    if [ -z "$input" ]; then
+        phpvm_err "Missing version argument."
+        phpvm_warn "Usage: phpvm resolve <version|alias|keyword>"
+        return "$PHPVM_EXIT_INVALID_ARG"
+    fi
+
+    # Handle "system" as a pass-through
+    if [ "$input" = "system" ]; then
+        printf '%s\n' "system"
+        return "$PHPVM_EXIT_SUCCESS"
+    fi
+
+    # Resolve aliases and special keywords
+    if ! version=$(phpvm_resolve_version "$input"); then
+        phpvm_err "Cannot resolve '$input'."
+        return "$PHPVM_EXIT_NOT_FOUND"
+    fi
+
+    # Validate the resolved version
+    if ! validate_php_version "$version"; then
+        phpvm_err "Invalid PHP version format after resolution: $version"
+        return "$PHPVM_EXIT_INVALID_ARG"
+    fi
+
+    if [ "$version" = "system" ]; then
+        printf '%s\n' "system"
+        return "$PHPVM_EXIT_SUCCESS"
+    fi
+
+    normalized_version=$(phpvm_normalize_version "$version") || {
+        phpvm_err "Invalid PHP version format: $version"
+        return "$PHPVM_EXIT_INVALID_ARG"
+    }
+
+    # In test mode, check mock installations
+    if phpvm_is_test_mode; then
+        if phpvm_test_php_installed "$normalized_version"; then
+            printf '%s\n' "$normalized_version"
+            return "$PHPVM_EXIT_SUCCESS"
+        fi
+        phpvm_err "PHP $normalized_version is not installed."
+        return "$PHPVM_EXIT_NOT_INSTALLED"
+    fi
+
+    # Check if the version is actually installed
+    if is_php_package_installed "$normalized_version"; then
+        printf '%s\n' "$normalized_version"
+        return "$PHPVM_EXIT_SUCCESS"
+    fi
+
+    phpvm_err "PHP $normalized_version is not installed."
+    return "$PHPVM_EXIT_NOT_INSTALLED"
+}
 
 # Main function to handle commands
 main() {
@@ -2859,6 +3258,10 @@ main() {
     version | --version | -v)
         print_version
         exit "$PHPVM_EXIT_SUCCESS"
+        ;;
+    unload)
+        phpvm_unload
+        exit "$?"
         ;;
     *)
         # All other commands need system detection and package manager
@@ -2918,6 +3321,10 @@ main() {
         phpvm_which "$@"
         exit "$?"
         ;;
+    resolve)
+        phpvm_resolve_to_installed "$@"
+        exit "$?"
+        ;;
     deactivate)
         phpvm_with_lock phpvm_deactivate false
         exit "$?"
@@ -2933,10 +3340,6 @@ main() {
     list | ls)
         list_installed_versions
         exit "$?"
-        ;;
-    version | --version | -v)
-        print_version
-        exit "$PHPVM_EXIT_SUCCESS"
         ;;
     info | sysinfo)
         print_system_info
@@ -3022,6 +3425,15 @@ if [ "${BASH_SOURCE[0]}" != "${0}" ]; then
     PHPVM_FUNCTIONS_LOADED=true
     export PHPVM_FUNCTIONS_LOADED
 
+    # Parse --no-use flag: skip auto-switch and cd hook registration
+    _phpvm_no_use=false
+    for _phpvm_arg in "$@"; do
+        if [ "$_phpvm_arg" = "--no-use" ]; then
+            _phpvm_no_use=true
+            break
+        fi
+    done
+
     # Initialize environment when sourced (do not exit on failure)
     phpvm_init_if_needed || true
 
@@ -3031,7 +3443,7 @@ if [ "${BASH_SOURCE[0]}" != "${0}" ]; then
     case $- in
     *i*)
         # Interactive shell - safe to auto-switch
-        if [ "${PHPVM_TEST_MODE}" != "true" ] && [ "${PHPVM_AUTO_USE:-true}" = "true" ]; then
+        if [ "$_phpvm_no_use" != "true" ] && [ "${PHPVM_TEST_MODE}" != "true" ] && [ "${PHPVM_AUTO_USE:-true}" = "true" ]; then
             if command -v find_phpvmrc > /dev/null 2>&1 && find_phpvmrc > /dev/null 2>&1; then
                 if command -v auto_switch_php_version > /dev/null 2>&1; then
                     auto_switch_php_version 2> /dev/null || true
@@ -3057,6 +3469,16 @@ if [ "${BASH_SOURCE[0]}" != "${0}" ]; then
         # Non-interactive shell - skip auto-switch
         ;;
     esac
+
+    # Source tab completion if available
+    _phpvm_completion_file="${PHPVM_DIR}/completions/phpvm.bash"
+    if [ -r "$_phpvm_completion_file" ]; then
+        # shellcheck source=/dev/null
+        . "$_phpvm_completion_file"
+    fi
+
+    # Clean up sourcing-time temp variables
+    unset _phpvm_no_use _phpvm_arg _phpvm_completion_file
 else
     # Script executed - run main
     # Verify main function exists

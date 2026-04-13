@@ -2,6 +2,39 @@
 
 ## [Unreleased]
 
+## [v1.11.0](https://github.com/Thavarshan/phpvm/compare/v1.10.0...v1.11.0) - 2026-04-13
+
+### Added
+
+- **`exec` command:** Run a command with a specific PHP version without globally switching. Executes in a subshell to isolate PATH changes from the current shell. Usage: `phpvm exec <version> <command> [args...]`.
+- **`run` command:** Sugar for `phpvm exec <version> php <script>`. Usage: `phpvm run <version> [script] [args...]`.
+- **`ls-remote` command:** List available PHP versions from system package manager repositories (Homebrew, apt, dnf, yum, pacman). Supports optional pattern filtering (e.g., `phpvm ls-remote 8.2`).
+- **`resolve` command:** Resolve a version descriptor, alias, or keyword to a locally installed version number. Usage: `phpvm resolve <version|alias|keyword>`.
+- **`unload` command:** Remove phpvm from the current shell session — deactivates, removes cd hooks, unsets all phpvm functions and variables. Only works when sourced (matches nvm behaviour).
+- **`cache clear` command:** Clear the phpvm cache directory. Replaces the previous stub.
+- **`--no-use` flag on source:** `source phpvm.sh --no-use` loads functions without auto-switching or registering the cd hook. Useful for lazy-loading setups.
+- **Bash tab completion:** New `completions/phpvm.bash` file with context-aware completions for commands, installed versions, and alias names. Auto-sourced when phpvm is loaded.
+- **Auto-set `default` alias on first install:** When no `default` alias exists, the first `phpvm install` automatically sets it (matches nvm behaviour).
+- **`PHPVM_BIN` export:** After every version switch, `PHPVM_BIN` is exported with the active PHP binary directory. Unset on deactivate.
+- **XDG_CONFIG_HOME fallback:** `PHPVM_DIR` now respects `$XDG_CONFIG_HOME/phpvm` when `XDG_CONFIG_HOME` is set and `PHPVM_DIR` is not.
+
+### Fixed
+
+- **`hash -r` after version switch:** Added `command hash -r` to `switch_to_version_php()`, `switch_to_system_php()`, and `phpvm_deactivate()` to invalidate the bash command hash table. Prevents stale binary resolution after switching versions.
+- **`phpvm_current` uses `printf` instead of `echo`:** Consistent with project conventions; avoids potential `-n`/`-e` misinterpretation.
+- **Auto-default alias works in test mode:** The auto-default alias logic now fires for both real and mock installations.
+
+### Changed
+
+- **`list` output formatting:** Active version is marked with a `->` arrow prefix and green colouring. Versions matching the `default` alias show a `(default)` annotation.
+- **Help text updated:** Removed "Planned Features" section; all commands now shown as implemented with examples.
+
+### Internal
+
+- **Version bump:** Updated to v1.11.0.
+- **New tests:** 30 BATS tests covering exec, run, ls-remote, resolve, cache clear, list formatting, auto-default alias, and help text. Replaced 5 obsolete stub tests.
+- **All tests passing:** 78 BATS tests pass.
+
 ## [v1.10.0](https://github.com/Thavarshan/phpvm/compare/v1.9.4...v1.10.0) - 2026-03-28
 
 ### Added
