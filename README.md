@@ -95,24 +95,24 @@ If the installation was successful, it should output the path to `phpvm`.
 
 ### Available Commands
 
-| Command                     | Description                                |
-| --------------------------- | ------------------------------------------ |
-| `phpvm install [version]`   | Install a PHP version (reads `.phpvmrc` if no version given) |
+| Command                     | Description                                                               |
+| --------------------------- | ------------------------------------------------------------------------- |
+| `phpvm install [version]`   | Install a PHP version (reads `.phpvmrc` if no version given)              |
 | `phpvm use [version]`       | Switch PHP version (reads `.phpvmrc` → default alias if no version given) |
-| `phpvm uninstall <version>` | Remove a specific PHP version              |
-| `phpvm current`             | Display the currently active PHP version   |
-| `phpvm which [version]`     | Show the path to PHP binary for a version  |
-| `phpvm deactivate`          | Temporarily disable phpvm and restore PATH |
-| `phpvm system`              | Switch to system/Homebrew default PHP      |
-| `phpvm auto`                | Auto-switch based on `.phpvmrc` file       |
-| `phpvm list` or `phpvm ls`  | List all installed PHP versions            |
-| `phpvm alias [name] [ver]`  | Create, update, or list version aliases    |
-| `phpvm unalias <name>`      | Remove version alias                       |
-| `phpvm cache dir`           | Show phpvm cache directory                 |
-| `phpvm info`                | Show system information for debugging      |
-| `phpvm version`             | Show version information                   |
-| `phpvm --version` / `-v`    | Show version information (aliases)         |
-| `phpvm help`                | Show help message                          |
+| `phpvm uninstall <version>` | Remove a specific PHP version                                             |
+| `phpvm current`             | Display the currently active PHP version                                  |
+| `phpvm which [version]`     | Show the path to PHP binary for a version                                 |
+| `phpvm deactivate`          | Temporarily disable phpvm and restore PATH                                |
+| `phpvm system`              | Switch to system/Homebrew default PHP                                     |
+| `phpvm auto`                | Auto-switch based on `.phpvmrc` file                                      |
+| `phpvm list` or `phpvm ls`  | List all installed PHP versions                                           |
+| `phpvm alias [name] [ver]`  | Create, update, or list version aliases                                   |
+| `phpvm unalias <name>`      | Remove version alias                                                      |
+| `phpvm cache dir`           | Show phpvm cache directory                                                |
+| `phpvm info`                | Show system information for debugging                                     |
+| `phpvm version`             | Show version information                                                  |
+| `phpvm --version` / `-v`    | Show version information (aliases)                                        |
+| `phpvm help`                | Show help message                                                         |
 
 ### Installing PHP Versions
 
@@ -341,7 +341,7 @@ fi
 | `PHPVM_DIR`               | `~/.phpvm` | Installation directory                                           |
 | `PHPVM_AUTO_USE`          | `true`     | Enable automatic `.phpvmrc` detection when sourced               |
 | `PHPVM_PHPVMRC_MAX_DEPTH` | `25`       | Max parent directories to traverse when searching for `.phpvmrc` |
-| `DEBUG`                   | `false`    | Enable debug logging with timestamps                             |
+| `PHPVM_DEBUG`             | `false`    | Enable debug logging with timestamps                             |
 | `NO_COLOR`                | _(unset)_  | Disable color output ([no-color.org](https://no-color.org/))     |
 | `PHPVM_LOG_TIMESTAMPS`    | `false`    | Always show timestamps in log output                             |
 
@@ -518,15 +518,15 @@ bats tests/01_core.bats
 ./phpvm.sh info
 
 # Test with debug output
-DEBUG=true ./phpvm.sh version
+PHPVM_DEBUG=true ./phpvm.sh version
 ```
 
 ### Debugging
 
-To enable debug output, set the `DEBUG` environment variable to `true`:
+To enable debug output, set the `PHPVM_DEBUG` environment variable to `true`:
 
 ```sh
-DEBUG=true phpvm install 8.1
+PHPVM_DEBUG=true phpvm install 8.1
 ```
 
 ## Maintainers

@@ -70,7 +70,7 @@ The tool detects and works with multiple package managers:
 - ShellCheck static analysis for code quality
 
 ### Debugging
-- Enable debug mode: `DEBUG=true phpvm <command>`
+- Enable debug mode: `PHPVM_DEBUG=true phpvm <command>`
 - Debug logs provide detailed execution tracing
 - Test mode can be enabled with `PHPVM_TEST_MODE=true`
 
@@ -100,11 +100,11 @@ bats tests/
 bats tests/01_core.bats
 
 # Enable debug mode for troubleshooting
-DEBUG=true bats tests/
+PHPVM_DEBUG=true bats tests/
 
 # Test specific functionality manually with test mode
-PHPVM_TEST_MODE=true DEBUG=true ./phpvm.sh install 8.1
-PHPVM_TEST_MODE=true DEBUG=true ./phpvm.sh use 8.1
+PHPVM_TEST_MODE=true PHPVM_DEBUG=true ./phpvm.sh install 8.1
+PHPVM_TEST_MODE=true PHPVM_DEBUG=true ./phpvm.sh use 8.1
 
 # Check shell syntax
 bash -n phpvm.sh
@@ -177,7 +177,7 @@ phpvm/
 ## Environment Variables
 
 - `PHPVM_DIR` - Installation directory (default: `~/.phpvm`)
-- `DEBUG` - Enable debug logging (set to `true`)
+- `PHPVM_DEBUG` - Enable debug logging (set to `true`)
 - `PHPVM_TEST_MODE` - Enable test mode (set to `true`)
 - `PHPVM_SOURCED` - Control execution vs sourcing behavior
 - `PHPVM_AUTO_USE` - Enable automatic `.phpvmrc` detection (default: `true`)

@@ -103,15 +103,20 @@
         PROFILE="$(phpvm_detect_profile)"
 
         if [ -n "$PROFILE" ]; then
-            phpvm_echo "Adding phpvm to $PROFILE"
-
-            # Check shell type and use appropriate syntax
-            if echo "$PROFILE" | grep -q "zsh"; then
-                # For zsh - use proper if statement to prevent shell crash
-                printf "\nexport PHPVM_DIR=\"%s\"\nexport PATH=\"\$PHPVM_DIR/bin:\$PATH\"\nif [[ -s \"\$PHPVM_DIR/phpvm.sh\" ]]; then\n  source \"\$PHPVM_DIR/phpvm.sh\"\nfi\n" "$(phpvm_install_dir)" >> "$PROFILE"
+            # Check if phpvm is already configured in the profile
+            if grep -qF 'PHPVM_DIR' "$PROFILE" 2>/dev/null; then
+                phpvm_echo "phpvm already configured in $PROFILE (skipping)"
             else
-                # For bash and others - use POSIX compatible syntax
-                printf "\nexport PHPVM_DIR=\"%s\"\nexport PATH=\"\$PHPVM_DIR/bin:\$PATH\"\n[ -s \"\$PHPVM_DIR/phpvm.sh\" ] && . \"\$PHPVM_DIR/phpvm.sh\"\n" "$(phpvm_install_dir)" >> "$PROFILE"
+                phpvm_echo "Adding phpvm to $PROFILE"
+
+                # Check shell type and use appropriate syntax
+                if echo "$PROFILE" | grep -q "zsh"; then
+                    # For zsh - use proper if statement to prevent shell crash
+                    printf "\nexport PHPVM_DIR=\"%s\"\nexport PATH=\"\$PHPVM_DIR/bin:\$PATH\"\nif [[ -s \"\$PHPVM_DIR/phpvm.sh\" ]]; then\n  source \"\$PHPVM_DIR/phpvm.sh\"\nfi\n" "$(phpvm_install_dir)" >> "$PROFILE"
+                else
+                    # For bash and others - use POSIX compatible syntax
+                    printf "\nexport PHPVM_DIR=\"%s\"\nexport PATH=\"\$PHPVM_DIR/bin:\$PATH\"\n[ -s \"\$PHPVM_DIR/phpvm.sh\" ] && . \"\$PHPVM_DIR/phpvm.sh\"\n" "$(phpvm_install_dir)" >> "$PROFILE"
+                fi
             fi
         else
             phpvm_warn "Could not detect profile file. Please manually add the following to your shell profile:"

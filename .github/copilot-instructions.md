@@ -43,6 +43,6 @@ Conventions: tag = `X.Y.Z` (no `v` prefix), title = `vX.Y.Z` (with `v` prefix).
 
 - `PHPVM_DIR` — Installation directory (default: `~/.phpvm`)
 - `PHPVM_TEST_MODE` — Enable test/mock mode
-- `DEBUG` — Enable debug logging
+- `PHPVM_DEBUG` — Enable debug logging
 - `PHPVM_AUTO_USE` — Enable automatic `.phpvmrc` detection
 - `PHPVM_PHPVMRC_MAX_DEPTH` — Max parent directory traversal for `.phpvmrc` (default: 25)
