@@ -2908,10 +2908,11 @@ phpvm_ls_remote() {
         # List all php formulae from Homebrew
         remote_versions=$(
             brew formulae 2> /dev/null | command grep -E '^php(@[0-9]+\.[0-9]+)?$' | while IFS= read -r formula; do
-                case "$formula" in
-                php) printf '%s\n' "$(brew_php_major_minor 2> /dev/null || printf '%s\n' 'latest')" ;;
-                php@*) printf '%s\n' "${formula#php@}" ;;
-                esac
+                if [ "$formula" = "php" ]; then
+                    printf '%s\n' "$(brew_php_major_minor 2> /dev/null || printf '%s\n' 'latest')"
+                else
+                    printf '%s\n' "${formula#php@}"
+                fi
             done | command sort -t. -k1,1n -k2,2n
         )
         ;;
