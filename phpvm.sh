@@ -2877,25 +2877,25 @@ phpvm_run() {
 # Example: phpvm ls-remote 8.2
 phpvm_ls_remote() {
     local pattern="${1:-}"
-    local versions=""
+    local remote_versions=""
 
     # In test mode, return a hardcoded list for testing
     if phpvm_is_test_mode; then
-        versions="7.4
+        remote_versions="7.4
 8.0
 8.1
 8.2
 8.3
 8.4"
         if [ -n "$pattern" ]; then
-            versions=$(printf '%s\n' "$versions" | command grep -F "$pattern")
+            remote_versions=$(printf '%s\n' "$remote_versions" | command grep -F "$pattern")
         fi
-        if [ -z "$versions" ]; then
+        if [ -z "$remote_versions" ]; then
             phpvm_warn "No PHP versions found matching '$pattern'."
             return "$PHPVM_EXIT_NOT_FOUND"
         fi
         phpvm_echo "Available remote PHP versions:"
-        printf '%s\n' "$versions" | while IFS= read -r v; do
+        printf '%s\n' "$remote_versions" | while IFS= read -r v; do
             printf '  %s\n' "$v"
         done
         return "$PHPVM_EXIT_SUCCESS"
@@ -2906,7 +2906,7 @@ phpvm_ls_remote() {
     case "$PKG_MANAGER" in
     brew)
         # List all php formulae from Homebrew
-        versions=$(
+        remote_versions=$(
             brew formulae 2> /dev/null | command grep -E '^php(@[0-9]+\.[0-9]+)?$' | while IFS= read -r formula; do
                 case "$formula" in
                 php) printf '%s\n' "$(brew_php_major_minor 2> /dev/null || printf '%s\n' 'latest')" ;;
@@ -2917,7 +2917,7 @@ phpvm_ls_remote() {
         ;;
     apt)
         # List PHP versions available from apt repositories
-        versions=$(
+        remote_versions=$(
             apt-cache search '^php[0-9]' 2> /dev/null |
                 command grep -oE 'php[0-9]+\.[0-9]+-cli' |
                 command sed 's/php//;s/-cli//' |
@@ -2926,7 +2926,7 @@ phpvm_ls_remote() {
         ;;
     dnf)
         # List PHP module streams available via dnf
-        versions=$(
+        remote_versions=$(
             dnf module list php 2> /dev/null |
                 command grep -oE '[0-9]+\.[0-9]+' |
                 command sort -t. -k1,1n -k2,2n -u
@@ -2934,7 +2934,7 @@ phpvm_ls_remote() {
         ;;
     yum)
         # List Remi PHP packages available via yum
-        versions=$(
+        remote_versions=$(
             yum list available 'php*-cli' 2> /dev/null |
                 command grep -oE 'php[0-9]+-php-cli' |
                 command sed 's/php//;s/-php-cli//' |
@@ -2944,7 +2944,7 @@ phpvm_ls_remote() {
         ;;
     pacman)
         # List PHP packages available via pacman
-        versions=$(
+        remote_versions=$(
             pacman -Ss '^php' 2> /dev/null |
                 command grep -oE 'php[0-9]*\s+[0-9]+\.[0-9]+' |
                 command grep -oE '[0-9]+\.[0-9]+' |
@@ -2958,11 +2958,11 @@ phpvm_ls_remote() {
     esac
 
     # Apply pattern filter if given
-    if [ -n "$pattern" ] && [ -n "$versions" ]; then
-        versions=$(printf '%s\n' "$versions" | command grep -F "$pattern")
+    if [ -n "$pattern" ] && [ -n "$remote_versions" ]; then
+        remote_versions=$(printf '%s\n' "$remote_versions" | command grep -F "$pattern")
     fi
 
-    if [ -z "$versions" ]; then
+    if [ -z "$remote_versions" ]; then
         if [ -n "$pattern" ]; then
             phpvm_warn "No PHP versions found matching '$pattern'."
         else
@@ -2972,7 +2972,7 @@ phpvm_ls_remote() {
     fi
 
     phpvm_echo "Available remote PHP versions:"
-    printf '%s\n' "$versions" | while IFS= read -r v; do
+    printf '%s\n' "$remote_versions" | while IFS= read -r v; do
         printf '  %s\n' "$v"
     done
     return "$PHPVM_EXIT_SUCCESS"
