@@ -1,17 +1,6 @@
-# v1.12.0 Release Notes
+## [v1.12.0](https://github.com/Thavarshan/phpvm/compare/v1.11.0...v1.12.0) - 2026-05-20
 
-## Added
+### Added
 
-- Add `latest-remote` keyword for `phpvm install`, allowing users to install the newest available PHP version from remote package manager repositories.
-- Add `latest-available` alias for `latest-remote`.
-
-## Details
-
-- `phpvm install latest-remote`
-- `phpvm install latest-available`
-
-## Notes
-
-- This feature works with existing package manager support for Homebrew, apt, dnf, yum, and pacman.
-- It complements `phpvm ls-remote`, which lists available remote versions.
-- In test mode, the remote version list is simulated for coverage.
+- **`latest-remote` keyword:** Install the newest available remote PHP version directly from package manager repos with `phpvm install latest-remote`.
+- **`latest-available` alias:** Alias for `latest-remote`.
