@@ -40,6 +40,7 @@ PHP 8.1.13
 - Seamlessly switch between installed PHP versions.
 - **Run commands with a specific PHP version** without globally switching (`phpvm exec`, `phpvm run`).
 - **List available remote PHP versions** from your system package manager (`phpvm ls-remote`).
+- **Install the latest available remote PHP version** with `phpvm install latest-remote`.
 - **Resolve version descriptors and aliases** to installed version numbers (`phpvm resolve`).
 - Auto-switch PHP versions based on project `.phpvmrc` (configurable depth via `PHPVM_PHPVMRC_MAX_DEPTH`).
 - Automatic directory-based switching via built-in cd hook (`PROMPT_COMMAND` for bash, `chpwd` for zsh).
@@ -120,6 +121,7 @@ If the installation was successful, it should output the path to `phpvm`.
 | `phpvm auto`                               | Auto-switch based on `.phpvmrc` file                                      |
 | `phpvm list` or `phpvm ls`                 | List all installed PHP versions                                           |
 | `phpvm ls-remote [pattern]`                | List available remote PHP versions                                        |
+| `phpvm install latest-remote`               | Install the latest remote PHP version available                          |
 | `phpvm resolve <version\|alias>`           | Resolve a version descriptor to an installed version                      |
 | `phpvm alias [name] [ver]`                 | Create, update, or list version aliases                                   |
 | `phpvm unalias <name>`                     | Remove version alias                                                      |

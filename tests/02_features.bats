@@ -49,6 +49,24 @@ load test_helper
     [[ ! "$output" =~ "7.4" ]]
 }
 
+@test "phpvm install latest-remote installs newest available PHP version" {
+    run install_php "latest-remote"
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Installing PHP 8.4" ]]
+    [[ "$output" =~ "PHP 8.4 installed." ]]
+    phpvm_test_php_installed "8.4"
+    [ "$?" -eq 0 ]
+}
+
+@test "phpvm install latest-available also installs newest available remote PHP" {
+    run install_php "latest-available"
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Installing PHP 8.4" ]]
+    [[ "$output" =~ "PHP 8.4 installed." ]]
+    phpvm_test_php_installed "8.4"
+    [ "$?" -eq 0 ]
+}
+
 # --- resolve command ---
 
 @test "phpvm resolve returns installed version" {
