@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`self-update` command:** Add `phpvm self-update` to automatically update phpvm to the latest stable release and print the updated version.
+
 ## [v1.12.0](https://github.com/Thavarshan/phpvm/compare/v1.11.0...v1.12.0) - 2026-05-20
 
 ### Added

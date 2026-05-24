@@ -2,7 +2,7 @@
 
 # phpvm - A PHP Version Manager for macOS and Linux
 # Author: Jerome Thayananthajothy (tjthavarshan@gmail.com)
-# Version: 1.10.0
+# Version: 1.12.1
 #
 # IMPORTANT: This script is written for bash and uses bashisms (arrays, process substitution, etc.)
 # For sourcing into your shell, use bash only. Zsh users should run phpvm via:
@@ -11,7 +11,7 @@
 
 # shellcheck disable=SC2155  # Allow declare and assign on same line for better readability
 
-PHPVM_VERSION="1.12.0"
+PHPVM_VERSION="1.12.1"
 
 # Test mode flag
 PHPVM_TEST_MODE="${PHPVM_TEST_MODE:-false}"
@@ -2623,6 +2623,7 @@ Usage:
   phpvm alias [name] [ver]  Create, update, or list version aliases
   phpvm unalias <name>      Remove version alias
   phpvm cache <dir|clear>   Manage cache directory
+  phpvm self-update         Update phpvm to the latest stable version
   phpvm help                Show this help message
   phpvm info                Show system information for debugging
   phpvm version             Show version information
@@ -2676,6 +2677,129 @@ Repository: https://github.com/Thavarshan/phpvm
 
 Usage: phpvm help
 EOF
+}
+
+phpvm_get_self_update_target() {
+    local script_path
+    if [ -n "${PHPVM_SELF_UPDATE_DEST:-}" ]; then
+        script_path="$PHPVM_SELF_UPDATE_DEST"
+    else
+        script_path="${BASH_SOURCE[0]:-$0}"
+    fi
+
+    if [ -L "$script_path" ] && command_exists readlink; then
+        local link
+        link=$(command readlink "$script_path")
+        if [ "${link#/}" != "$link" ]; then
+            script_path="$link"
+        else
+            local dir
+            dir=$(cd "$(dirname "$script_path")" 2> /dev/null && pwd)
+            script_path="$dir/$link"
+        fi
+    fi
+
+    printf '%s
+' "$script_path"
+}
+
+phpvm_download_url_to_file() {
+    local url="$1"
+    local output="$2"
+
+    if command_exists curl; then
+        command curl --fail --silent --location "$url" > "$output"
+        return "$?"
+    fi
+
+    if command_exists wget; then
+        command wget --quiet --output-document="$output" "$url"
+        return "$?"
+    fi
+
+    phpvm_err "curl or wget is required for self-update."
+    return "$PHPVM_EXIT_ERROR"
+}
+
+phpvm_extract_version_from_file() {
+    local file="$1"
+    local version
+
+    version=$(command grep -Eo 'PHPVM_VERSION="[0-9]+\.[0-9]+\.[0-9]+"' "$file" 2> /dev/null | command head -1 | command sed 's/PHPVM_VERSION="//;s/"$//')
+    if [ -z "$version" ]; then
+        return "$PHPVM_EXIT_ERROR"
+    fi
+
+    printf '%s
+' "$version"
+    return "$PHPVM_EXIT_SUCCESS"
+}
+
+phpvm_self_update() {
+    local source_url="${PHPVM_SELF_UPDATE_URL:-https://raw.githubusercontent.com/Thavarshan/phpvm/main/phpvm.sh}"
+    local tmp_file
+    local remote_version
+    local target_script
+
+    target_script=$(phpvm_get_self_update_target) || return "$PHPVM_EXIT_ERROR"
+    if [ -z "$target_script" ]; then
+        phpvm_err "Unable to determine phpvm script path for self-update."
+        return "$PHPVM_EXIT_ERROR"
+    fi
+
+    tmp_file=$(mktemp) || {
+        phpvm_err "Failed to create temporary file for self-update."
+        return "$PHPVM_EXIT_FILE_ERROR"
+    }
+
+    if phpvm_is_test_mode && [ -n "${PHPVM_SELF_UPDATE_TEST_SOURCE:-}" ]; then
+        if [ ! -f "$PHPVM_SELF_UPDATE_TEST_SOURCE" ]; then
+            rm -f "$tmp_file"
+            phpvm_err "Self-update test source not found: $PHPVM_SELF_UPDATE_TEST_SOURCE"
+            return "$PHPVM_EXIT_FILE_ERROR"
+        fi
+        command cp "$PHPVM_SELF_UPDATE_TEST_SOURCE" "$tmp_file"
+    else
+        if ! phpvm_download_url_to_file "$source_url" "$tmp_file"; then
+            rm -f "$tmp_file"
+            phpvm_err "Failed to download phpvm update from $source_url"
+            return "$PHPVM_EXIT_ERROR"
+        fi
+    fi
+
+    remote_version=$(phpvm_extract_version_from_file "$tmp_file") || {
+        rm -f "$tmp_file"
+        phpvm_err "Failed to determine remote phpvm version."
+        return "$PHPVM_EXIT_ERROR"
+    }
+
+    if [ "$remote_version" = "$PHPVM_VERSION" ]; then
+        rm -f "$tmp_file"
+        phpvm_echo "You are already on the latest version: v$PHPVM_VERSION."
+        return "$PHPVM_EXIT_SUCCESS"
+    fi
+
+    phpvm_echo "Updating phpvm..."
+
+    if [ ! -w "$target_script" ] && command_exists sudo; then
+        if ! run_with_sudo cp "$tmp_file" "$target_script"; then
+            rm -f "$tmp_file"
+            phpvm_err "Failed to update phpvm."
+            return "$PHPVM_EXIT_ERROR"
+        fi
+    else
+        if ! command cp "$tmp_file" "$target_script"; then
+            rm -f "$tmp_file"
+            phpvm_err "Failed to update phpvm."
+            return "$PHPVM_EXIT_ERROR"
+        fi
+    fi
+
+    chmod +x "$target_script" 2> /dev/null || true
+    rm -f "$tmp_file"
+
+    phpvm_echo "phpvm successfully updated to the latest version: v$remote_version."
+    return "$PHPVM_EXIT_SUCCESS"
 }
 
 # Print system information for debugging
@@ -3283,6 +3407,10 @@ main() {
         print_version
         exit "$PHPVM_EXIT_SUCCESS"
         ;;
+    self-update)
+        phpvm_self_update
+        exit "$?"
+        ;;
     unload)
         phpvm_unload
         exit "$?"
@@ -3403,6 +3531,10 @@ main() {
         ;;
     cache)
         phpvm_cache "$@"
+        exit "$?"
+        ;;
+    self-update)
+        phpvm_self_update
         exit "$?"
         ;;
     *)

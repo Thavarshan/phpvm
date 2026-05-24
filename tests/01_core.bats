@@ -18,6 +18,33 @@ load test_helper
     [[ "$output" =~ "Usage:" ]]
 }
 
+@test "phpvm self-update reports already latest version" {
+    local remote_file="$TEST_DIR/phpvm-latest.sh"
+    cat > "$remote_file" <<'EOF'
+#!/bin/bash
+PHPVM_VERSION="1.12.1"
+EOF
+
+    run env PHPVM_TEST_MODE=true PHPVM_SELF_UPDATE_TEST_SOURCE="$remote_file" PHPVM_SELF_UPDATE_DEST="$TEST_DIR/phpvm-self-update-target.sh" bash "$BATS_TEST_DIRNAME/../phpvm.sh" self-update
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "You are already on the latest version: v1.12.1." ]]
+}
+
+@test "phpvm self-update replaces script when newer version is available" {
+    local remote_file="$TEST_DIR/phpvm-updated.sh"
+    local target_file="$TEST_DIR/phpvm-self-update-target.sh"
+    cat > "$remote_file" <<'EOF'
+#!/bin/bash
+PHPVM_VERSION="1.12.2"
+EOF
+    touch "$target_file"
+
+    run env PHPVM_TEST_MODE=true PHPVM_SELF_UPDATE_TEST_SOURCE="$remote_file" PHPVM_SELF_UPDATE_DEST="$target_file" bash "$BATS_TEST_DIRNAME/../phpvm.sh" self-update
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "phpvm successfully updated to the latest version: v1.12.2." ]]
+    [ "$(grep -oE 'PHPVM_VERSION="[0-9]+\.[0-9]+\.[0-9]+"' "$target_file")" = "PHPVM_VERSION=\"1.12.2\"" ]
+}
+
 @test "sanitize_input rejects dangerous characters" {
     run sanitize_input "8.1; rm -rf /"
     [ "$status" -ne 0 ]
