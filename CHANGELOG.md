@@ -15,6 +15,10 @@
 - **`latest-remote` keyword:** Install the newest available remote PHP version directly from package manager repos with `phpvm install latest-remote`.
 - **`latest-available` alias:** Alias for `latest-remote`.
 
+## [v1.11.0](https://github.com/Thavarshan/phpvm/compare/v1.10.0...v1.11.0) - 2026-04-13
+
+### Added
+
 - **`exec` command:** Run a command with a specific PHP version without globally switching. Executes in a subshell to isolate PATH changes from the current shell. Usage: `phpvm exec <version> <command> [args...]`.
 - **`run` command:** Sugar for `phpvm exec <version> php <script>`. Usage: `phpvm run <version> [script] [args...]`.
 - **`ls-remote` command:** List available PHP versions from system package manager repositories (Homebrew, apt, dnf, yum, pacman). Supports optional pattern filtering (e.g., `phpvm ls-remote 8.2`).
