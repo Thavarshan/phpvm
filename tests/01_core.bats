@@ -18,6 +18,83 @@ load test_helper
     [[ "$output" =~ "Usage:" ]]
 }
 
+@test "phpvm self-update reports already latest version" {
+    local remote_file="$TEST_DIR/phpvm-latest.sh"
+    cat > "$remote_file" <<'EOF'
+#!/bin/bash
+PHPVM_VERSION="1.12.1"
+EOF
+
+    run env PHPVM_TEST_MODE=true PHPVM_SELF_UPDATE_TEST_SOURCE="$remote_file" PHPVM_SELF_UPDATE_DEST="$TEST_DIR/phpvm-self-update-target.sh" bash "$BATS_TEST_DIRNAME/../phpvm.sh" self-update
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "You are already on the latest version: v1.12.1." ]]
+}
+
+@test "phpvm self-update replaces script when newer version is available" {
+    local remote_file="$TEST_DIR/phpvm-updated.sh"
+    local target_file="$TEST_DIR/phpvm-self-update-target.sh"
+    cat > "$remote_file" <<'EOF'
+#!/bin/bash
+PHPVM_VERSION="1.12.2"
+EOF
+    touch "$target_file"
+
+    run env PHPVM_TEST_MODE=true PHPVM_SELF_UPDATE_TEST_SOURCE="$remote_file" PHPVM_SELF_UPDATE_DEST="$target_file" bash "$BATS_TEST_DIRNAME/../phpvm.sh" self-update
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "phpvm successfully updated to the latest version: v1.12.2." ]]
+    [ "$(grep -oE 'PHPVM_VERSION="[0-9]+\.[0-9]+\.[0-9]+"' "$target_file")" = "PHPVM_VERSION=\"1.12.2\"" ]
+}
+
+@test "phpvm self-update downloads from remote URL and updates script" {
+    if ! command -v python3 > /dev/null 2>&1; then
+        skip "python3 is required for remote self-update integration test"
+    fi
+
+    local server_root="$TEST_DIR/http-server"
+    local server_log="$TEST_DIR/http-server.log"
+    local target_file="$TEST_DIR/phpvm-self-update-http-target.sh"
+    mkdir -p "$server_root"
+
+    cat > "$server_root/phpvm.sh" <<'EOF'
+#!/bin/bash
+PHPVM_VERSION="1.12.3"
+EOF
+    chmod +x "$server_root/phpvm.sh"
+
+    python3 - "$server_root" <<'PY' > "$server_log" 2>&1 &
+import http.server
+import socketserver
+import os
+import sys
+
+os.chdir(sys.argv[1])
+with socketserver.TCPServer(("127.0.0.1", 0), http.server.SimpleHTTPRequestHandler) as httpd:
+    print(httpd.server_address[1], flush=True)
+    sys.stdout.flush()
+    httpd.serve_forever()
+PY
+    local server_pid=$!
+    sleep 1
+
+    local port
+    port=$(head -n 1 "$server_log" | tr -d '[:space:]')
+    if [ -z "$port" ]; then
+        kill "$server_pid" > /dev/null 2>&1 || true
+        wait "$server_pid" 2>/dev/null || true
+        echo "Failed to start local HTTP server" >&2
+        return 1
+    fi
+
+    touch "$target_file"
+
+    trap 'kill "$server_pid" > /dev/null 2>&1 || true; wait "$server_pid" 2>/dev/null || true' RETURN
+
+    run env PHPVM_TEST_MODE=true PHPVM_SELF_UPDATE_URL="http://127.0.0.1:$port/phpvm.sh" PHPVM_SELF_UPDATE_DEST="$target_file" bash "$BATS_TEST_DIRNAME/../phpvm.sh" self-update
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "phpvm successfully updated to the latest version: v1.12.3." ]]
+    [ "$(grep -oE 'PHPVM_VERSION="[0-9]+\.[0-9]+\.[0-9]+"' "$target_file")" = "PHPVM_VERSION=\"1.12.3\"" ]
+}
+
 @test "sanitize_input rejects dangerous characters" {
     run sanitize_input "8.1; rm -rf /"
     [ "$status" -ne 0 ]
