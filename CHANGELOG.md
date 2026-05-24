@@ -15,9 +15,6 @@
 - **`latest-remote` keyword:** Install the newest available remote PHP version directly from package manager repos with `phpvm install latest-remote`.
 - **`latest-available` alias:** Alias for `latest-remote`.
 
-
-### Added
-
 - **`exec` command:** Run a command with a specific PHP version without globally switching. Executes in a subshell to isolate PATH changes from the current shell. Usage: `phpvm exec <version> <command> [args...]`.
 - **`run` command:** Sugar for `phpvm exec <version> php <script>`. Usage: `phpvm run <version> [script] [args...]`.
 - **`ls-remote` command:** List available PHP versions from system package manager repositories (Homebrew, apt, dnf, yum, pacman). Supports optional pattern filtering (e.g., `phpvm ls-remote 8.2`).
@@ -323,7 +320,7 @@
 
 ## [v1.3.0](https://github.com/Thavarshan/phpvm/compare/v1.2.0...v1.3.0) - 2025-05-11
 
-## Added
+### Added
 
 - Added `system` command to easily switch back to system PHP version
 - Added timestamps to all log messages for better traceability and debugging
@@ -336,7 +333,7 @@
 - Added ability to run self-tests with `phpvm test` command
 - Added debugging capability via `DEBUG=true` environment variable
 
-## Changed
+### Changed
 
 - Changed logging format to include timestamps and log levels
 - Changed sudo handling to use a centralized helper function
@@ -347,7 +344,7 @@
 - Improved bash/zsh shell compatibility with better sourcing logic
 - Improved code organization and reduced duplication with helper functions
 
-## Fixed
+### Fixed
 
 - Fixed shell crash issue when sourcing in zsh with p10k theme
 - Fixed path expansion issues in Ubuntu bashrc configurations
