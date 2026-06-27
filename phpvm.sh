@@ -11,7 +11,7 @@
 
 # shellcheck disable=SC2155  # Allow declare and assign on same line for better readability
 
-PHPVM_VERSION="1.12.1"
+PHPVM_VERSION="1.12.2"
 
 # Test mode flag
 PHPVM_TEST_MODE="${PHPVM_TEST_MODE:-false}"
@@ -931,11 +931,11 @@ pkg_search_php() {
         fi
         ;;
     dnf)
-        # Check for module stream availability (preferred for versioned PHP)
-        if dnf module list php 2> /dev/null | command grep -Eq "php[[:space:]]+${version}[[:space:]]|${version}[[:space:]]+\["; then
+        # Use stream resolution to handle both Remi (remi-X.Y) and AppStream (X.Y) naming
+        if [ -n "$(dnf_resolve_php_stream "$version")" ]; then
             return 0
         fi
-        # If any php module exists, signal "some versions exist"
+        # If any php module exists, signal "some versions exist but not this one"
         if dnf module list php 2> /dev/null | command grep -q "^php"; then
             return 2
         fi
@@ -1204,6 +1204,39 @@ check_remi_repository() {
     fi
 }
 
+# Return the DNF major version (4 or 5), or 0 if dnf not found
+dnf_major_version() {
+    command dnf --version 2> /dev/null | command awk 'NR==1{split($1,a,"."); print a[1]+0}'
+}
+
+# Resolve the actual dnf module stream name for a PHP X.Y version.
+# Remi uses "remi-X.Y", RHEL AppStream uses "X.Y".
+# Prints the stream name (e.g. "remi-8.2") or nothing if not found.
+dnf_resolve_php_stream() {
+    local version="$1"
+    command dnf module list php 2> /dev/null | command awk -v ver="$version" '
+        $1 == "php" {
+            stream = $2
+            # Exact match (AppStream: "8.2") or suffix match (Remi: "remi-8.2")
+            if (stream == ver || substr(stream, length(stream) - length(ver)) == "-" ver) {
+                # Prefer remi- streams when available; collect all and pick last-or-remi
+                if (substr(stream, 1, 5) == "remi-") { remi = stream }
+                else { plain = stream }
+            }
+        }
+        END { if (remi != "") print remi; else if (plain != "") print plain }
+    '
+}
+
+# Return 0 if the given php module stream is currently enabled, 1 otherwise.
+dnf_stream_enabled() {
+    local stream="$1"
+    command dnf module list php 2> /dev/null | command awk -v s="$stream" '
+        $1 == "php" && $2 == s { if (index($3, "[e]") || index($4, "[e]") || index($0, "[e]")) found=1 }
+        END { exit (found ? 0 : 1) }
+    '
+}
+
 # Detect if PHP packages are available in current repositories
 detect_php_availability() {
     local version="$1"
@@ -1218,9 +1251,23 @@ suggest_repository_setup() {
     local version="$1"
     local major_minor
     local major_version
+    local dnf_ver
+
+    # Emit the correct "dnf config-manager" syntax for the installed dnf version.
+    # DNF5 (Fedora 41+) removed --set-enabled; use "setopt <repo>.enabled=1" instead.
+    _dnf_enable_repo_cmd() {
+        local repo="$1"
+        dnf_ver=$(dnf_major_version)
+        if [ "${dnf_ver:-0}" -ge 5 ]; then
+            printf '  sudo dnf config-manager setopt %s.enabled=1\n' "$repo"
+        else
+            printf '  sudo dnf config-manager --set-enabled %s\n' "$repo"
+        fi
+    }
 
     if [ "$PKG_MANAGER" = "dnf" ] || [ "$PKG_MANAGER" = "yum" ]; then
         if [ "$PHPVM_LINUX_DISTRO" = "fedora" ]; then
+            major_minor=$(echo "$version" | cut -d. -f1,2)
             phpvm_echo ""
             phpvm_echo "PHP packages not found in default Fedora repositories."
             phpvm_echo "To install PHP $version, you need to enable Remi's repository:"
@@ -1232,16 +1279,16 @@ suggest_repository_setup() {
                 phpvm_echo "  sudo dnf install https://rpms.remirepo.net/fedora/remi-release-42.rpm"
             fi
             phpvm_echo ""
-            phpvm_echo "  # Enable the repository"
-            phpvm_echo "  sudo dnf config-manager --set-enabled remi"
+            phpvm_echo "  # Enable the Remi repository"
+            _dnf_enable_repo_cmd "remi"
             phpvm_echo ""
-            phpvm_echo "  # Enable specific PHP version repository"
-            major_minor=$(echo "$version" | cut -d. -f1,2 | tr -d '.')
-            phpvm_echo "  sudo dnf config-manager --set-enabled remi-php$major_minor"
+            phpvm_echo "  # Enable the PHP module stream for version $major_minor"
+            phpvm_echo "  sudo dnf module enable php:remi-${major_minor} -y"
             phpvm_echo ""
             phpvm_echo "After setting up the repositories, try: phpvm install $version"
 
         elif [ "$PHPVM_LINUX_DISTRO" = "rhel" ] || [ "$PHPVM_LINUX_DISTRO" = "rocky" ] || [ "$PHPVM_LINUX_DISTRO" = "almalinux" ] || [ "$PHPVM_LINUX_DISTRO" = "centos" ]; then
+            major_minor=$(echo "$version" | cut -d. -f1,2 | tr -d '.')
             phpvm_echo ""
             phpvm_echo "PHP packages not found in default RHEL/CentOS repositories."
             phpvm_echo "To install PHP $version, you need to enable EPEL and Remi repositories:"
@@ -1258,9 +1305,8 @@ suggest_repository_setup() {
             fi
             phpvm_echo ""
             phpvm_echo "  # Enable the repositories"
-            phpvm_echo "  sudo dnf config-manager --set-enabled remi"
-            major_minor=$(echo "$version" | cut -d. -f1,2 | tr -d '.')
-            phpvm_echo "  sudo dnf config-manager --set-enabled remi-php$major_minor"
+            _dnf_enable_repo_cmd "remi"
+            _dnf_enable_repo_cmd "remi-php${major_minor}"
             phpvm_echo ""
             phpvm_echo "After setting up the repositories, try: phpvm install $version"
         fi
@@ -1612,15 +1658,27 @@ install_php_dnf() {
 
     # Try to enable the module stream first
     if command_exists dnf && dnf module list php > /dev/null 2>&1; then
-        phpvm_echo "Enabling PHP:${normalized_version} module stream..."
-        if ! run_with_sudo dnf module reset php -y 2> /dev/null; then
-            phpvm_warn "Failed to reset PHP module"
-        fi
-        if ! run_with_sudo dnf module enable php:"${normalized_version}" -y; then
-            phpvm_warn "Failed to enable PHP:${normalized_version} module stream"
+        local php_stream
+        php_stream=$(dnf_resolve_php_stream "$normalized_version")
+        if [ -z "$php_stream" ]; then
+            phpvm_warn "No php module stream found for PHP ${normalized_version}"
             phpvm_warn "You may need Remi repository for this PHP version"
             suggest_repository_setup "$version"
             return "$PHPVM_EXIT_ERROR"
+        fi
+        phpvm_echo "Enabling php:${php_stream} module stream..."
+        if dnf_stream_enabled "$php_stream"; then
+            phpvm_debug "Module stream php:${php_stream} is already enabled — skipping reset/enable"
+        else
+            if ! run_with_sudo dnf module reset php -y 2> /dev/null; then
+                phpvm_warn "Failed to reset PHP module"
+            fi
+            if ! run_with_sudo dnf module enable "php:${php_stream}" -y; then
+                phpvm_warn "Failed to enable php:${php_stream} module stream"
+                phpvm_warn "You may need Remi repository for this PHP version"
+                suggest_repository_setup "$version"
+                return "$PHPVM_EXIT_ERROR"
+            fi
         fi
     fi
 
@@ -2018,9 +2076,22 @@ switch_to_version_php() {
         elif [ "$PKG_MANAGER" = "dnf" ]; then
             # Try dnf module approach for RHEL/Fedora
             if command_exists dnf && dnf module list php > /dev/null 2>&1; then
-                phpvm_debug "Attempting to enable PHP $normalized_version module"
-                if ! run_with_sudo dnf module enable php:"$normalized_version" -y; then
-                    phpvm_warn "Failed to enable PHP $normalized_version module."
+                local use_stream
+                use_stream=$(dnf_resolve_php_stream "$normalized_version")
+                if [ -n "$use_stream" ]; then
+                    phpvm_debug "Attempting to enable php:${use_stream} module"
+                    if dnf_stream_enabled "$use_stream"; then
+                        phpvm_debug "Module stream php:${use_stream} already enabled"
+                    else
+                        if ! run_with_sudo dnf module reset php -y 2> /dev/null; then
+                            phpvm_warn "Failed to reset PHP module"
+                        fi
+                        if ! run_with_sudo dnf module enable "php:${use_stream}" -y; then
+                            phpvm_warn "Failed to enable php:${use_stream} module."
+                        fi
+                    fi
+                else
+                    phpvm_warn "No php module stream found for PHP $normalized_version"
                 fi
             fi
             # After module enable, check if binary exists
