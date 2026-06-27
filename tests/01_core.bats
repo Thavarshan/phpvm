@@ -22,12 +22,12 @@ load test_helper
     local remote_file="$TEST_DIR/phpvm-latest.sh"
     cat > "$remote_file" <<'EOF'
 #!/bin/bash
-PHPVM_VERSION="1.12.1"
+PHPVM_VERSION="1.12.2"
 EOF
 
     run env PHPVM_TEST_MODE=true PHPVM_SELF_UPDATE_TEST_SOURCE="$remote_file" PHPVM_SELF_UPDATE_DEST="$TEST_DIR/phpvm-self-update-target.sh" bash "$BATS_TEST_DIRNAME/../phpvm.sh" self-update
     [ "$status" -eq 0 ]
-    [[ "$output" =~ "You are already on the latest version: v1.12.1." ]]
+    [[ "$output" =~ "You are already on the latest version: v1.12.2." ]]
 }
 
 @test "phpvm self-update replaces script when newer version is available" {
@@ -35,14 +35,14 @@ EOF
     local target_file="$TEST_DIR/phpvm-self-update-target.sh"
     cat > "$remote_file" <<'EOF'
 #!/bin/bash
-PHPVM_VERSION="1.12.2"
+PHPVM_VERSION="1.12.3"
 EOF
     touch "$target_file"
 
     run env PHPVM_TEST_MODE=true PHPVM_SELF_UPDATE_TEST_SOURCE="$remote_file" PHPVM_SELF_UPDATE_DEST="$target_file" bash "$BATS_TEST_DIRNAME/../phpvm.sh" self-update
     [ "$status" -eq 0 ]
-    [[ "$output" =~ "phpvm successfully updated to the latest version: v1.12.2." ]]
-    [ "$(grep -oE 'PHPVM_VERSION="[0-9]+\.[0-9]+\.[0-9]+"' "$target_file")" = "PHPVM_VERSION=\"1.12.2\"" ]
+    [[ "$output" =~ "phpvm successfully updated to the latest version: v1.12.3." ]]
+    [ "$(grep -oE 'PHPVM_VERSION="[0-9]+\.[0-9]+\.[0-9]+"' "$target_file")" = "PHPVM_VERSION=\"1.12.3\"" ]
 }
 
 @test "phpvm self-update downloads from remote URL and updates script" {
