@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [v1.12.2](https://github.com/Thavarshan/phpvm/compare/v1.12.1...v1.12.2) - 2026-06-27
+
+### Fixed
+
+- **DNF5 / Fedora 41+ module stream naming (issue #20):** `phpvm install` and `phpvm use` now resolve the actual php module stream name from `dnf module list php` instead of hardcoding `php:X.Y`. Remi streams (`remi-8.2`, `remi-8.3`, …) and RHEL AppStream streams (`8.2`) are both detected automatically.
+- **Destructive unconditional `dnf module reset` (issue #20):** The reset is now skipped when the correct stream is already enabled, preventing phpvm from clobbering a stream the user configured manually.
+- **Invalid DNF5 recovery instructions (issue #20):** `suggest_repository_setup` now emits `dnf config-manager setopt <repo>.enabled=1` on DNF5 (Fedora 41+) instead of the removed `--set-enabled` flag. Fedora instructions no longer reference the non-existent `remi-php82` repo; instead they direct users to enable the module stream (`dnf module enable php:remi-X.Y -y`).
+- **False "not found" for un-enabled Remi streams (issue #20):** `pkg_search_php` now uses stream resolution to detect `remi-X.Y` streams even before they are enabled, so phpvm correctly reports a version as installable rather than emitting the misleading "other PHP versions are available" message.
+
 ## [v1.12.1](https://github.com/Thavarshan/phpvm/compare/v1.12.0...v1.12.1) - 2026-05-24
 
 ### Added
