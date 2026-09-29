@@ -2,7 +2,29 @@
 
 ## [Unreleased]
 
-## [v1.12.2](https://github.com/Thavarshan/phpvm/compare/v1.12.1...v1.12.2) - 2026-06-27
+## [v1.13.0](https://github.com/Thavarshan/phpvm/compare/1.12.2...1.13.0) - 2026-09-29
+
+### Added
+
+- **Opt-in per-shell PHP switching:** Set `PHPVM_SWITCH_MODE=session` before sourcing phpvm to select PHP independently in each Bash or Zsh shell without changing Homebrew links or Linux alternatives.
+- **Verified session interpreter paths:** Session switching and `exec` use a version-specific `php` entry that points to the requested verified CLI binary, including versioned Linux and Remi layouts.
+- **Release bundle delivery:** Install and self-update distribute the script and Bash completions together; release preparation validates the tagged version and creates a draft with a checksummed archive.
+
+### Fixed
+
+- **Version resolution failures:** Install, use, uninstall, and exec now return failure when alias or keyword resolution fails.
+- **Session-local state:** `current`, `which`, list markers, deactivate, and unload reflect the calling shell and leave shared active-version files unchanged.
+- **Shell entry point:** Sourcing defines a `phpvm` function so session changes apply to the caller in Bash and Zsh.
+- **Inherited shells and subprocesses:** Child shells detect their package manager when needed; `exec` and `run` keep PATH and session metadata in sync, including `system`.
+- **Interpreter lookup:** `which` honors explicit versions and aliases, and Homebrew's unversioned formula resolves through its own installation rather than the shared link.
+- **Protected updates:** Self-update stages replacements with the required permissions and restores the previous script if completion delivery fails.
+
+### Changed
+
+- **Default update source:** `self-update` now reads the latest published stable release bundle; `PHPVM_SELF_UPDATE_URL` remains available for a single-script override.
+- **Release conventions:** Tags use `X.Y.Z`; release titles use `vX.Y.Z`.
+
+## [v1.12.2](https://github.com/Thavarshan/phpvm/compare/1.12.1...1.12.2) - 2026-06-27
 
 ### Fixed
 
@@ -11,20 +33,20 @@
 - **Invalid DNF5 recovery instructions (issue #20):** `suggest_repository_setup` now emits `dnf config-manager setopt <repo>.enabled=1` on DNF5 (Fedora 41+) instead of the removed `--set-enabled` flag. Fedora instructions no longer reference the non-existent `remi-php82` repo; instead they direct users to enable the module stream (`dnf module enable php:remi-X.Y -y`).
 - **False "not found" for un-enabled Remi streams (issue #20):** `pkg_search_php` now uses stream resolution to detect `remi-X.Y` streams even before they are enabled, so phpvm correctly reports a version as installable rather than emitting the misleading "other PHP versions are available" message.
 
-## [v1.12.1](https://github.com/Thavarshan/phpvm/compare/v1.12.0...v1.12.1) - 2026-05-24
+## [v1.12.1](https://github.com/Thavarshan/phpvm/compare/1.12.0...1.12.1) - 2026-05-24
 
 ### Added
 
 - **`self-update` command:** Add `phpvm self-update` to automatically update phpvm to the latest stable release and print the updated version.
 
-## [v1.12.0](https://github.com/Thavarshan/phpvm/compare/v1.11.0...v1.12.0) - 2026-05-20
+## [v1.12.0](https://github.com/Thavarshan/phpvm/compare/1.11.0...1.12.0) - 2026-05-20
 
 ### Added
 
 - **`latest-remote` keyword:** Install the newest available remote PHP version directly from package manager repos with `phpvm install latest-remote`.
 - **`latest-available` alias:** Alias for `latest-remote`.
 
-## [v1.11.0](https://github.com/Thavarshan/phpvm/compare/v1.10.0...v1.11.0) - 2026-04-13
+## [v1.11.0](https://github.com/Thavarshan/phpvm/compare/1.10.0...1.11.0) - 2026-04-13
 
 ### Added
 
@@ -57,7 +79,7 @@
 - **New tests:** 30 BATS tests covering exec, run, ls-remote, resolve, cache clear, list formatting, auto-default alias, and help text. Replaced 5 obsolete stub tests.
 - **All tests passing:** 78 BATS tests pass.
 
-## [v1.10.0](https://github.com/Thavarshan/phpvm/compare/v1.9.4...v1.10.0) - 2026-03-28
+## [v1.10.0](https://github.com/Thavarshan/phpvm/compare/1.9.4...1.10.0) - 2026-03-28
 
 ### Added
 
@@ -79,7 +101,7 @@
 - **Updated error-handling tests:** Adjusted existing no-arg error tests to match new messages.
 - **All tests passing:** 56 BATS tests pass.
 
-## [v1.9.4](https://github.com/Thavarshan/phpvm/compare/v1.9.3...v1.9.4) - 2026-03-15
+## [v1.9.4](https://github.com/Thavarshan/phpvm/compare/1.9.3...1.9.4) - 2026-03-15
 
 ### Fixed
 
@@ -90,7 +112,7 @@
 
 - **Version bump:** Updated to v1.9.4.
 
-## [v1.9.3](https://github.com/Thavarshan/phpvm/compare/v1.9.2...v1.9.3) - 2026-03-15
+## [v1.9.3](https://github.com/Thavarshan/phpvm/compare/1.9.2...1.9.3) - 2026-03-15
 
 ### Fixed
 
@@ -100,7 +122,7 @@
 
 - **Version bump:** Updated to v1.9.3.
 
-## [v1.9.2](https://github.com/Thavarshan/phpvm/compare/v1.9.1...v1.9.2) - 2026-03-15
+## [v1.9.2](https://github.com/Thavarshan/phpvm/compare/1.9.1...1.9.2) - 2026-03-15
 
 ### Changed
 
@@ -119,7 +141,7 @@
 - **Version bump:** Updated to v1.9.2.
 - **All tests passing:** 51 BATS tests pass.
 
-## [v1.9.1](https://github.com/Thavarshan/phpvm/compare/v1.9.0...v1.9.1) - 2026-03-15
+## [v1.9.1](https://github.com/Thavarshan/phpvm/compare/1.9.0...1.9.1) - 2026-03-15
 
 ### Fixed
 
@@ -137,7 +159,7 @@
 - **Version bump:** Updated to v1.9.1.
 - **All tests passing:** 51 BATS tests pass.
 
-## [v1.9.0](https://github.com/Thavarshan/phpvm/compare/v1.8.0...v1.9.0) - 2026-01-30
+## [v1.9.0](https://github.com/Thavarshan/phpvm/compare/1.8.0...1.9.0) - 2026-01-30
 
 ### Fixed
 
@@ -190,7 +212,7 @@
 - **Version bump:** Updated to v1.9.0.
 - **All tests passing:** 51 BATS tests pass (added 4 security tests for path traversal protection).
 
-## [v1.8.0](https://github.com/Thavarshan/phpvm/compare/v1.7.0...v1.8.0) - 2026-01-12
+## [v1.8.0](https://github.com/Thavarshan/phpvm/compare/1.7.0...1.8.0) - 2026-01-12
 
 ### Added
 
@@ -217,7 +239,7 @@
 - **Alias helper utilities:** Added alias listing helper and alias resolution logic.
 - **Test coverage:** Extended BATS test suite to cover alias functionality and all core features.
 
-## [v1.7.0](https://github.com/Thavarshan/phpvm/compare/v1.6.0...v1.7.0) - 2025-12-10
+## [v1.7.0](https://github.com/Thavarshan/phpvm/compare/1.6.0...1.7.0) - 2025-12-10
 
 ### Added
 
@@ -251,7 +273,7 @@
   - `phpvm_deactivate()` - Disables phpvm temporarily
 - **Expanded test suite:** Added tests for `phpvm_current`, `phpvm_which`, and `phpvm_deactivate` (now 14 tests total).
 
-## [v1.6.0](https://github.com/Thavarshan/phpvm/compare/v1.5.0...v1.6.0) - 2025-09-15
+## [v1.6.0](https://github.com/Thavarshan/phpvm/compare/1.5.0...1.6.0) - 2025-09-15
 
 ### Added
 
@@ -278,7 +300,7 @@
 - **Removed emoji characters:** Cleaned up all emoji usage from codebase for better terminal compatibility and professional appearance.
 - **Removed redundant workflow files:** Eliminated duplicate testing workflows (use.yml, comprehensive-test.yml, performance-test.yml, integration-test.yml) by consolidating functionality into main test.yml.
 
-## [v1.5.0](https://github.com/Thavarshan/phpvm/compare/v1.4.1...v1.5.0) - 2025-08-15
+## [v1.5.0](https://github.com/Thavarshan/phpvm/compare/1.4.1...1.5.0) - 2025-08-15
 
 ### Added
 
@@ -302,7 +324,7 @@
 - **Fixed PHP version listing on Linux:** Improved reliability of `phpvm list` command showing installed PHP versions on apt-based systems.
 - **Fixed error handling for missing PHP binaries:** Added proper error handling when PHP commands are not available, preventing script crashes.
 
-## [v1.4.1](https://github.com/Thavarshan/phpvm/compare/v1.4.0...v1.4.1) - 2025-07-13
+## [v1.4.1](https://github.com/Thavarshan/phpvm/compare/1.4.0...1.4.1) - 2025-07-13
 
 ### Fixed
 
@@ -311,7 +333,7 @@
 - **Enhanced shell compatibility with argument-based detection:** Added more reliable execution detection by checking for script arguments as the primary indicator, with the original `return` test maintained as fallback for POSIX shell compatibility.
 - **Improved detection layer ordering:** Reorganized execution detection logic to prioritize more reliable methods (argument presence) over shell-specific tests that behave inconsistently across different environments.
 
-## [v1.4.0](https://github.com/Thavarshan/phpvm/compare/v1.3.0...v1.4.0) - 2025-06-23
+## [v1.4.0](https://github.com/Thavarshan/phpvm/compare/1.3.0...1.4.0) - 2025-06-23
 
 ### Added
 
@@ -331,7 +353,7 @@
 - **Fixed installation/uninstallation edge cases:** Improved handling of various system configurations during installation and uninstallation processes.
 - **Enhanced error handling during cleanup operations:** Better error reporting and recovery when removing phpvm components from the system.
 
-## [v1.3.0](https://github.com/Thavarshan/phpvm/compare/v1.2.0...v1.3.0) - 2025-05-11
+## [v1.3.0](https://github.com/Thavarshan/phpvm/compare/1.2.0...1.3.0) - 2025-05-11
 
 ### Added
 
@@ -368,7 +390,7 @@
 - Fixed script execution issues when sourced from shell initialization files
 - Fixed various edge cases in version detection and switching
 
-## [v1.2.0](https://github.com/Thavarshan/phpvm/compare/v1.1.0...v1.2.0) - 2025-02-15
+## [v1.2.0](https://github.com/Thavarshan/phpvm/compare/1.1.0...1.2.0) - 2025-02-15
 
 ### Added
 
@@ -388,7 +410,7 @@
 - **Resolved Test Failures:** The `install_php`, `use_php_version`, and `auto_switch_php_version` tests now properly execute across different OS platforms.
 - **Prevented Test Cleanup Failures:** The `teardown` function now ensures `.phpvmrc` and other temporary files are removed only if they exist.
 
-## [v1.1.0](https://github.com/Thavarshan/phpvm/compare/v1.0.0...v1.1.0) - 2025-02-09
+## [v1.1.0](https://github.com/Thavarshan/phpvm/compare/1.0.0...1.1.0) - 2025-02-09
 
 ### Added
 
@@ -412,7 +434,7 @@
   - SC2128 (incorrect array handling)
 - Fixed potential issues with word splitting and globbing by ensuring proper quoting of variables in command calls.
 
-## [v1.0.0](https://github.com/Thavarshan/phpvm/compare/v0.0.1...v1.0.0) - 2025-02-04
+## [v1.0.0](https://github.com/Thavarshan/phpvm/compare/0.0.1...1.0.0) - 2025-02-04
 
 ### Added
 
@@ -428,6 +450,6 @@
 - Prevented terminal crashes due to incorrect sourcing in shell startup scripts.
 - Improved handling of missing PHP versions.
 
-## [v0.0.1](https://github.com/Thavarshan/phpvm/compare/v0.0.0...v0.0.1) - 2024-10-05
+## [v0.0.1](https://github.com/Thavarshan/phpvm/compare/0.0.0...0.0.1) - 2024-10-05
 
 Initial release for public testing and feedback.

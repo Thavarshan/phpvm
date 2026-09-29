@@ -14,7 +14,7 @@
 
 ```sh
 $ phpvm version
-phpvm version 1.12.1
+phpvm version 1.13.0
 
 PHP Version Manager for macOS and Linux
 Author: Jerome Thayananthajothy <tjthavarshan@gmail.com>
@@ -162,6 +162,21 @@ Verify the active version with:
 ```sh
 php -v
 ```
+
+### Per-Shell Switching (Opt-In)
+
+By default, `phpvm use` switches PHP through Homebrew links or Linux alternatives, which affects every shell using those system paths. To select a version independently in each Bash or Zsh shell, set session mode before sourcing phpvm:
+
+```sh
+export PHPVM_SWITCH_MODE=session
+source "$PHPVM_DIR/phpvm.sh"
+phpvm use 8.2
+php -v
+```
+
+Each shell can then select a different installed PHP version. `phpvm use system` removes phpvm's session path entry and uses the first system PHP found on the remaining `PATH`; `phpvm deactivate` clears the selection while preserving other PATH edits. `phpvm current`, `phpvm which`, and `phpvm list` report the calling shell's selection. In this mode, run switching commands through the sourced `phpvm` function. The standalone script rejects `use`, `system`, and `auto` because a child process cannot change its parent shell.
+
+Session mode manages the PHP CLI binary used by `php`, PHP scripts, and commands such as `php composer.phar`. It does not switch `phpize`, `php-config`, FPM, web-server settings, or hard-coded interpreter paths. Package installation and removal still use the detected system package manager. Updates or removals made outside phpvm can affect shells using that PHP installation.
 
 ### Checking Current PHP Version
 
@@ -457,6 +472,7 @@ fi
 | Variable                  | Default    | Description                                                                              |
 | ------------------------- | ---------- | ---------------------------------------------------------------------------------------- |
 | `PHPVM_DIR`               | `~/.phpvm` | Installation directory (falls back to `$XDG_CONFIG_HOME/phpvm` if `XDG_CONFIG_HOME` set) |
+| `PHPVM_SWITCH_MODE`       | `global`   | Set to `session` before sourcing to switch PHP independently in each shell              |
 | `PHPVM_BIN`               | _(export)_ | Active PHP binary directory (set after version switch, unset on deactivate)              |
 | `PHPVM_AUTO_USE`          | `true`     | Enable automatic `.phpvmrc` detection when sourced                                       |
 | `PHPVM_PHPVMRC_MAX_DEPTH` | `25`       | Max parent directories to traverse when searching for `.phpvmrc`                         |

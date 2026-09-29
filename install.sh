@@ -20,9 +20,11 @@
     }
 
     # Default installation directory
+    PHPVM_DIR="${PHPVM_DIR:-${XDG_CONFIG_HOME:+$XDG_CONFIG_HOME/phpvm}}"
     PHPVM_DIR="${PHPVM_DIR:-$HOME/.phpvm}"
     PHPVM_SCRIPT="$PHPVM_DIR/phpvm.sh"
-    GITHUB_REPO_URL="https://raw.githubusercontent.com/Thavarshan/phpvm/main/phpvm.sh"
+    PHPVM_RELEASE_VERSION="1.13.0"
+    GITHUB_RAW_BASE="${PHPVM_INSTALL_SOURCE_BASE:-https://raw.githubusercontent.com/Thavarshan/phpvm/$PHPVM_RELEASE_VERSION}"
 
     phpvm_install_dir() {
         if [ -n "$PHPVM_DIR" ]; then
@@ -82,16 +84,29 @@
 
     install_phpvm_as_script() {
         local INSTALL_DIR
+        local script_tmp
+        local completion_tmp
         INSTALL_DIR="$(phpvm_install_dir)"
-        mkdir -p "$INSTALL_DIR/bin"
+        script_tmp="$(mktemp)"
+        completion_tmp="$(mktemp)"
 
-        phpvm_echo "Downloading phpvm script from $GITHUB_REPO_URL..."
-        phpvm_download "$GITHUB_REPO_URL" > "$INSTALL_DIR/phpvm.sh" || {
+        phpvm_echo "Downloading phpvm v$PHPVM_RELEASE_VERSION..."
+        phpvm_download "$GITHUB_RAW_BASE/phpvm.sh" > "$script_tmp" || {
+            rm -f "$script_tmp" "$completion_tmp"
             phpvm_err "Failed to download phpvm script"
             exit 1
         }
+        phpvm_download "$GITHUB_RAW_BASE/completions/phpvm.bash" > "$completion_tmp" || {
+            rm -f "$script_tmp" "$completion_tmp"
+            phpvm_err "Failed to download phpvm completions"
+            exit 1
+        }
 
-        chmod +x "$INSTALL_DIR/phpvm.sh"
+        mkdir -p "$INSTALL_DIR/bin" "$INSTALL_DIR/completions"
+        chmod +x "$script_tmp"
+        mv "$script_tmp" "$INSTALL_DIR/phpvm.sh"
+        mv "$completion_tmp" "$INSTALL_DIR/completions/phpvm.bash"
+
         ln -sf "$INSTALL_DIR/phpvm.sh" "$INSTALL_DIR/bin/phpvm"
     }
 
@@ -121,16 +136,6 @@
         else
             phpvm_warn "Could not detect profile file. Please manually add the following to your shell profile:"
             printf "\nexport PHPVM_DIR=\"%s\"\nexport PATH=\"\$PHPVM_DIR/bin:\$PATH\"\n[ -s \"\$PHPVM_DIR/phpvm.sh\" ] && . \"\$PHPVM_DIR/phpvm.sh\"\n" "$(phpvm_install_dir)"
-        fi
-
-        phpvm_echo "Applying changes..."
-        export PATH="$PHPVM_DIR/bin:$PATH"
-
-        # Only source the profile if it exists
-        if [ -f "$PROFILE" ]; then
-            # Use . instead of source for POSIX compatibility
-            # shellcheck disable=SC1090
-            . "$PROFILE" 2> /dev/null || true
         fi
 
         phpvm_echo "phpvm installation complete!"

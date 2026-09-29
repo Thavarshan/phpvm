@@ -37,7 +37,7 @@ The tool detects and works with multiple package managers:
 
 ### Version Management
 - Install PHP versions using system package managers
-- Switch between installed versions using symlinks and package manager tools
+- Switch globally through package-manager tools by default; `PHPVM_SWITCH_MODE=session` selects versions per sourced Bash or Zsh shell
 - System PHP fallback support
 - Active version tracking via `~/.phpvm/active_version`
 
@@ -117,31 +117,13 @@ time ./phpvm.sh help
 
 ### Release Process
 
-Conventions: tag = `X.Y.Z` (no `v` prefix), title = `vX.Y.Z` (with `v` prefix).
+Tags use `X.Y.Z` (no `v` prefix); GitHub release titles use `vX.Y.Z`.
 
-1. **Bump version** in `PHPVM_VERSION` variable at the top of `phpvm.sh`
-2. **Update CHANGELOG.md** — add a new section under `[Unreleased]` following the existing format:
-   ```
-   ## [vX.Y.Z](https://github.com/Thavarshan/phpvm/compare/vPREV...vX.Y.Z) - YYYY-MM-DD
-   ```
-   Use subsections: `### Fixed`, `### Changed`, `### Removed`, `### Internal` as needed.
-3. **Verify syntax and tests pass:**
-   ```bash
-   bash -n phpvm.sh
-   bats tests/
-   ```
-4. **Commit and push:**
-   ```bash
-   git add phpvm.sh CHANGELOG.md
-   git commit -m "chore: release vX.Y.Z — short description"
-   git push origin main
-   ```
-5. **Create GitHub release** (triggers the `release.yml` workflow):
-   ```bash
-   gh release create X.Y.Z --title "vX.Y.Z" --notes-file /path/to/notes.md
-   ```
-   Or use `--notes "..."` for short notes. Prefer `--notes-file` for multi-line content to avoid shell quoting issues.
-6. **Update README.md** if needed (new features, changed env vars, etc.)
+1. Update `PHPVM_VERSION`, the dated `CHANGELOG.md` section, and user documentation.
+2. Run `make check` and review/merge the release change to `main`.
+3. Create and push an annotated version tag: `git tag -a X.Y.Z -m 'Release vX.Y.Z' && git push origin X.Y.Z`.
+4. The tag workflow validates the version and tests, packages the installer, script, completions, docs and license, and opens a draft release with a SHA-256 checksum.
+5. Verify installation/update behavior and the draft assets, then publish the draft in GitHub Releases.
 
 ## Key Functions in phpvm.sh
 
@@ -177,6 +159,7 @@ phpvm/
 ## Environment Variables
 
 - `PHPVM_DIR` - Installation directory (default: `~/.phpvm`)
+- `PHPVM_SWITCH_MODE` - `global` by default; set to `session` before sourcing for per-shell switching
 - `PHPVM_DEBUG` - Enable debug logging (set to `true`)
 - `PHPVM_TEST_MODE` - Enable test mode (set to `true`)
 - `PHPVM_SOURCED` - Control execution vs sourcing behavior

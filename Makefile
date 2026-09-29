@@ -178,12 +178,12 @@ clean:
 release: check
 	@echo "$(GREEN)Ready for release!$(NC)"
 	@echo ""
-	@echo "Next steps:"
-	@echo "  1. Update CHANGELOG.md with release notes"
-	@echo "  2. Update version in phpvm.sh (PHPVM_VERSION)"
-	@echo "  3. Commit changes: git commit -am 'chore: prepare vX.Y.Z release'"
-	@echo "  4. Create tag: git tag -a vX.Y.Z -m 'Release vX.Y.Z'"
-	@echo "  5. Push: git push origin main --tags"
+	@echo "Next steps (tag format X.Y.Z; release title vX.Y.Z):"
+	@echo "  1. Update PHPVM_VERSION and add the dated CHANGELOG.md release section"
+	@echo "  2. Merge the reviewed release change to main"
+	@echo "  3. Create and push the annotated tag: git tag -a X.Y.Z -m 'Release vX.Y.Z' && git push origin X.Y.Z"
+	@echo "  4. Wait for the tag workflow to validate assets and create a draft release"
+	@echo "  5. Verify the draft archive and checksum, then publish it on GitHub"
 
 # Prevent make from treating files as targets
 .NOTPARALLEL:

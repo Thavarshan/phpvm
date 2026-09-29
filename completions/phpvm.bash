@@ -7,7 +7,7 @@ _phpvm_completions() {
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD - 1]}"
 
-    commands="install uninstall use current which list ls ls-remote alias unalias exec run resolve cache deactivate system auto info version help unload"
+    commands="install uninstall use current which list ls ls-remote alias unalias exec run resolve cache deactivate system auto info version help unload self-update"
 
     case "$prev" in
     use | uninstall | which | exec | run | resolve)
@@ -33,7 +33,7 @@ _phpvm_completions() {
             done < <(brew list --formula 2> /dev/null | command grep -E '^php(@[0-9]+\.[0-9]+)?$')
         fi
 
-        versions="$versions system"
+        versions="$versions system latest stable default"
         # shellcheck disable=SC2207  # Intentional: word splitting for COMPREPLY
         COMPREPLY=($(compgen -W "$versions" -- "$cur"))
         return
@@ -62,7 +62,7 @@ _phpvm_completions() {
         ;;
     cache)
         # shellcheck disable=SC2207
-        COMPREPLY=($(compgen -W "clear" -- "$cur"))
+        COMPREPLY=($(compgen -W "dir clear" -- "$cur"))
         return
         ;;
     phpvm)
