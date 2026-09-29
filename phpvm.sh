@@ -1216,10 +1216,10 @@ phpvm_session_system() {
 
 phpvm_session_current() {
     if [ -n "${PHPVM_SESSION_VERSION:-}" ]; then
-        [ -n "${PHPVM_SESSION_BIN:-}" ] && [ -x "$PHPVM_SESSION_BIN/php" ] || {
+        if [ -z "${PHPVM_SESSION_BIN:-}" ] || [ ! -x "$PHPVM_SESSION_BIN/php" ]; then
             printf '%s\n' none
             return "$PHPVM_EXIT_NOT_INSTALLED"
-        }
+        fi
         printf '%s\n' "$PHPVM_SESSION_VERSION"
     elif command -v php > /dev/null 2>&1; then
         printf '%s\n' system
