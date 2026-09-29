@@ -354,10 +354,9 @@ jobs:
           fi
 
           echo "=== Testing PHP Installation ==="
-          ./phpvm.sh install 8.3 || echo "PHP 8.3 installation attempted"
-          ./phpvm.sh use 8.3 || echo "Switch to 8.3 attempted"
+          ./phpvm.sh install 8.3
+          ./phpvm.sh use 8.3
           ./phpvm.sh list
-          ./phpvm.sh system || echo "System switch attempted"
 
       - name: Test Project Workflow
         run: |
@@ -369,7 +368,7 @@ jobs:
           mkdir -p test_project
           echo "8.3" > test_project/.phpvmrc
           cd test_project
-          ../phpvm.sh auto || echo "Auto-switch attempted"
+          ../phpvm.sh auto
           cd ..
 
       - name: Test Error Recovery

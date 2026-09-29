@@ -193,6 +193,10 @@ EOF
     install_php 8.1
     install_php 8.2
     export PHPVM_SWITCH_MODE=session
+    mkdir -p "$TEST_DIR/system/bin"
+    printf '#!/bin/sh\nexit 0\n' > "$TEST_DIR/system/bin/php"
+    chmod +x "$TEST_DIR/system/bin/php"
+    export PATH="$TEST_DIR/system/bin:$PATH"
     local system_php
     system_php=$(command -v php)
     phpvm use 8.1

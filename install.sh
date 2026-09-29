@@ -138,16 +138,6 @@
             printf "\nexport PHPVM_DIR=\"%s\"\nexport PATH=\"\$PHPVM_DIR/bin:\$PATH\"\n[ -s \"\$PHPVM_DIR/phpvm.sh\" ] && . \"\$PHPVM_DIR/phpvm.sh\"\n" "$(phpvm_install_dir)"
         fi
 
-        phpvm_echo "Applying changes..."
-        export PATH="$PHPVM_DIR/bin:$PATH"
-
-        # Only source the profile if it exists
-        if [ -f "$PROFILE" ]; then
-            # Use . instead of source for POSIX compatibility
-            # shellcheck disable=SC1090
-            . "$PROFILE" 2> /dev/null || true
-        fi
-
         phpvm_echo "phpvm installation complete!"
         phpvm_echo "You may need to restart your terminal or run: source $PROFILE"
         phpvm_echo "Then try: phpvm install 8.2 && phpvm use 8.2"
