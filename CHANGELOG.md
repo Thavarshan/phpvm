@@ -26,6 +26,7 @@
 - **Self-update integrity (#33):** Release bundles are verified against the published SHA-256 checksum, older releases are no longer installed as updates, and the installer rejects truncated or mismatched downloads.
 - **PATH entries with glob characters (#34):** Session PATH handling no longer expands entries such as `a*` against the current directory.
 - **Newest PHP on Homebrew:** The unversioned `php` formula's version is read from Homebrew metadata, so `ls-remote` lists it and `phpvm install` (including Composer-driven installs) can install it before it is present locally.
+- **Version ordering:** `latest`, Composer resolution, and the self-update downgrade guard compare each version component numerically, so `1.14.10` is newer than `1.14.9` and `8.2.10` newer than `8.2.9`.
 - **Composer constraints under older Bash:** The constraint reaches awk as an argument, so matching also works while a DEBUG trap is active (macOS Bash 3.2, bash-preexec).
 - **CI coverage (#35):** The integration job names the package manager it exercises (apt on Ubuntu, Homebrew on macOS) without installing unused Linuxbrew, and BATS publishes JUnit results.
 - **Developer documentation (#36):** `CLAUDE.md` and `install-bats.sh` describe the current layout, workflows, and test command.

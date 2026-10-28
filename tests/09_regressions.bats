@@ -230,6 +230,27 @@ exit 0'
     [ "$status" -eq 2 ]
 }
 
+@test "version sorting compares each component numerically" {
+    [ "$(printf '1.14.9\n1.14.10\n' | phpvm_latest_from_list)" = "1.14.10" ]
+    [ "$(printf '8.2.10\n8.2.9\n' | phpvm_latest_from_list)" = "8.2.10" ]
+    [ "$(printf '8.9\n8.10\n7.4\n' | phpvm_latest_from_list)" = "8.10" ]
+    [ "$(printf 'latest\n8.3\n8.4\n' | phpvm_latest_from_list)" = "8.4" ]
+}
+
+@test "self-update accepts a release whose patch gains a digit" {
+    local script="$TEST_DIR/phpvm-1.14.9.sh"
+    local remote_file="$TEST_DIR/newer.sh"
+    local target_file="$TEST_DIR/installed.sh"
+    sed 's/^PHPVM_VERSION=".*"$/PHPVM_VERSION="1.14.9"/' "$BATS_TEST_DIRNAME/../phpvm.sh" > "$script"
+    printf '#!/bin/bash\nPHPVM_VERSION="1.14.10"\n' > "$remote_file"
+    printf 'original\n' > "$target_file"
+
+    run env PHPVM_TEST_MODE=true PHPVM_SELF_UPDATE_TEST_SOURCE="$remote_file" PHPVM_SELF_UPDATE_DEST="$target_file" bash "$script" self-update
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "updated to the latest version: v1.14.10" ]]
+    grep -q 'PHPVM_VERSION="1.14.10"' "$target_file"
+}
+
 # --- #34: PATH entries with glob characters ---
 
 @test "session PATH stripping keeps glob characters literal (#34)" {

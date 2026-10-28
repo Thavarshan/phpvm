@@ -706,14 +706,15 @@ phpvm_warn_patch_version_once() {
 
 # Portable version sorter (works on BSD and GNU sort)
 # Reads versions on stdin, outputs latest X.Y[.Z]
+# Each component becomes its own sort key so 1.14.10 sorts after 1.14.9.
 phpvm_latest_from_list() {
     command awk -F. '
-      NF==2 { printf "%d.%d.%d %s\n",$1,$2,0,$0; next }
-      NF>=3 { printf "%d.%d.%d %s\n",$1,$2,$3,$0; next }
+      NF==2 { printf "%d %d %d %s\n",$1,$2,0,$0; next }
+      NF>=3 { printf "%d %d %d %s\n",$1,$2,$3,$0; next }
     ' |
         command sort -k1,1n -k2,2n -k3,3n |
         command tail -1 |
-        command awk '{print $2}'
+        command awk '{print $4}'
 }
 
 # ============================================================================
