@@ -22,12 +22,12 @@ load test_helper
     local remote_file="$TEST_DIR/phpvm-latest.sh"
     cat > "$remote_file" << 'EOF'
 #!/bin/bash
-PHPVM_VERSION="1.13.0"
+PHPVM_VERSION="1.14.0"
 EOF
 
     run env PHPVM_TEST_MODE=true PHPVM_SELF_UPDATE_TEST_SOURCE="$remote_file" PHPVM_SELF_UPDATE_DEST="$TEST_DIR/phpvm-self-update-target.sh" bash "$BATS_TEST_DIRNAME/../phpvm.sh" self-update
     [ "$status" -eq 0 ]
-    [[ "$output" =~ "You are already on the latest version: v1.13.0." ]]
+    [[ "$output" =~ "You are already on the latest version: v1.14.0." ]]
 }
 
 @test "phpvm self-update replaces script when newer version is available" {
@@ -35,14 +35,14 @@ EOF
     local target_file="$TEST_DIR/phpvm-self-update-target.sh"
     cat > "$remote_file" << 'EOF'
 #!/bin/bash
-PHPVM_VERSION="1.13.1"
+PHPVM_VERSION="1.14.1"
 EOF
     touch "$target_file"
 
     run env PHPVM_TEST_MODE=true PHPVM_SELF_UPDATE_TEST_SOURCE="$remote_file" PHPVM_SELF_UPDATE_DEST="$target_file" bash "$BATS_TEST_DIRNAME/../phpvm.sh" self-update
     [ "$status" -eq 0 ]
-    [[ "$output" =~ "phpvm successfully updated to the latest version: v1.13.1." ]]
-    [ "$(grep -oE 'PHPVM_VERSION="[0-9]+\.[0-9]+\.[0-9]+"' "$target_file")" = "PHPVM_VERSION=\"1.13.1\"" ]
+    [[ "$output" =~ "phpvm successfully updated to the latest version: v1.14.1." ]]
+    [ "$(grep -oE 'PHPVM_VERSION="[0-9]+\.[0-9]+\.[0-9]+"' "$target_file")" = "PHPVM_VERSION=\"1.14.1\"" ]
 }
 
 @test "phpvm self-update downloads from remote URL and updates script" {
@@ -57,7 +57,7 @@ EOF
 
     cat > "$server_root/phpvm.sh" << 'EOF'
 #!/bin/bash
-PHPVM_VERSION="1.13.1"
+PHPVM_VERSION="1.14.1"
 EOF
     chmod +x "$server_root/phpvm.sh"
 
@@ -91,8 +91,8 @@ PY
 
     run env PHPVM_TEST_MODE=true PHPVM_SELF_UPDATE_URL="http://127.0.0.1:$port/phpvm.sh" PHPVM_SELF_UPDATE_DEST="$target_file" bash "$BATS_TEST_DIRNAME/../phpvm.sh" self-update
     [ "$status" -eq 0 ]
-    [[ "$output" =~ "phpvm successfully updated to the latest version: v1.13.1." ]]
-    [ "$(grep -oE 'PHPVM_VERSION="[0-9]+\.[0-9]+\.[0-9]+"' "$target_file")" = "PHPVM_VERSION=\"1.13.1\"" ]
+    [[ "$output" =~ "phpvm successfully updated to the latest version: v1.14.1." ]]
+    [ "$(grep -oE 'PHPVM_VERSION="[0-9]+\.[0-9]+\.[0-9]+"' "$target_file")" = "PHPVM_VERSION=\"1.14.1\"" ]
 }
 
 @test "phpvm self-update installs a validated release bundle and completions" {
@@ -102,16 +102,17 @@ PY
     mkdir -p "$release_dir/completions" "$PHPVM_DIR/completions"
     cat > "$release_dir/phpvm.sh" << 'EOF'
 #!/bin/bash
-PHPVM_VERSION="1.13.1"
+PHPVM_VERSION="1.14.1"
 EOF
     printf 'complete -W "use install" phpvm\n' > "$release_dir/completions/phpvm.bash"
     tar -czf "$bundle" -C "$release_dir" phpvm.sh completions
-    printf '#!/bin/bash\nPHPVM_VERSION="1.13.0"\n' > "$target_file"
+    write_sha256 "$bundle"
+    printf '#!/bin/bash\nPHPVM_VERSION="1.14.0"\n' > "$target_file"
 
     run env PHPVM_TEST_MODE=true PHPVM_SELF_UPDATE_TEST_BUNDLE="$bundle" PHPVM_SELF_UPDATE_DEST="$target_file" bash "$BATS_TEST_DIRNAME/../phpvm.sh" self-update
     [ "$status" -eq 0 ]
-    [[ "$output" =~ "updated to the latest version: v1.13.1" ]]
-    grep -q '1.13.1' "$target_file"
+    [[ "$output" =~ "updated to the latest version: v1.14.1" ]]
+    grep -q '1.14.1' "$target_file"
     [ -s "$PHPVM_DIR/completions/phpvm.bash" ]
 }
 
@@ -120,12 +121,12 @@ EOF
     local target_file="$TEST_DIR/phpvm-self-update-target.sh"
     mkdir -p "$PHPVM_DIR/completions"
     printf 'not a tar archive\n' > "$bundle"
-    printf '#!/bin/bash\nPHPVM_VERSION="1.13.0"\n' > "$target_file"
+    printf '#!/bin/bash\nPHPVM_VERSION="1.14.0"\n' > "$target_file"
     printf 'old completion\n' > "$PHPVM_DIR/completions/phpvm.bash"
 
     run env PHPVM_TEST_MODE=true PHPVM_SELF_UPDATE_TEST_BUNDLE="$bundle" PHPVM_SELF_UPDATE_DEST="$target_file" bash "$BATS_TEST_DIRNAME/../phpvm.sh" self-update
     [ "$status" -ne 0 ]
-    grep -q '1.13.0' "$target_file"
+    grep -q '1.14.0' "$target_file"
     grep -q 'old completion' "$PHPVM_DIR/completions/phpvm.bash"
 }
 
@@ -253,6 +254,7 @@ EOF
     printf '#!/bin/bash\nPHPVM_VERSION="99.0.0"\n' > "$release_dir/phpvm.sh"
     printf 'new completion\n' > "$release_dir/completions/phpvm.bash"
     tar -czf "$TEST_DIR/release.tar.gz" -C "$release_dir" phpvm.sh completions
+    write_sha256 "$TEST_DIR/release.tar.gz"
     printf 'original script\n' > "$TEST_DIR/installed.sh"
     chmod 755 "$TEST_DIR/installed.sh"
     printf 'original completion\n' > "$PHPVM_DIR/completions/phpvm.bash"

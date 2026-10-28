@@ -12,6 +12,8 @@ setup() {
     export PHPVM_VERSIONS_DIR="$PHPVM_DIR/versions"
     export PHPVM_ACTIVE_VERSION_FILE="$PHPVM_DIR/active_version"
     export PHPVM_CURRENT_SYMLINK="$PHPVM_DIR/current"
+    # Keep mock PHP installations inside this test's directory
+    export TEST_PREFIX="$TEST_DIR/prefix"
 
     # Source phpvm
     source "$BATS_TEST_DIRNAME/../phpvm.sh"
@@ -26,6 +28,18 @@ teardown() {
     if [ -n "$TEST_DIR" ] && [ -d "$TEST_DIR" ]; then
         rm -rf "$TEST_DIR"
     fi
+}
+
+# Write a "<digest>  <name>" SHA-256 file next to a release bundle
+write_sha256() {
+    local file="$1"
+    local digest
+    if command -v sha256sum > /dev/null 2>&1; then
+        digest=$(sha256sum "$file" | awk '{print $1}')
+    else
+        digest=$(shasum -a 256 "$file" | awk '{print $1}')
+    fi
+    printf '%s  %s\n' "$digest" "$(basename "$file")" > "$file.sha256"
 }
 
 # Helper function to create mock PHP installation

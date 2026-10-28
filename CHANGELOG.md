@@ -2,6 +2,40 @@
 
 ## [Unreleased]
 
+## [v1.14.0](https://github.com/Thavarshan/phpvm/compare/1.13.0...1.14.0) - 2026-10-28
+
+### Added
+
+- **Composer-aware version detection:** Without a version argument, `phpvm use`, `phpvm install`, and `phpvm resolve` read the nearest project pin. Each directory is checked for `.phpvmrc`, then for the PHP requirement in `composer.json`; `config.platform.php` takes precedence over `require.php`.
+- **Composer constraint matching:** Requirements such as `^8.1`, `~8.2.0`, `>=8.1 <8.4`, `8.2.*`, `8.1 - 8.3`, and `^7.4 || ^8.2` select the newest matching installed version for `use` and `resolve`, and the newest matching available version for `install`.
+- **`phpvm resolve` without arguments:** Prints the installed version that satisfies the current project's pin.
+- **`phpvm exec` and `phpvm run` without a version (#27):** Both use the project pin (`.phpvmrc` or `composer.json`) when the first argument is not a version, keyword, or alias, matching `nvm exec` and `nvm run`.
+- **`phpvm self-update --force`:** Reinstalls the latest release, including when it is older than the installed copy.
+- **`PHPVM_APT_INSTALL_FPM`:** Set to `true` to install `phpX.Y-fpm` alongside the CLI on apt systems.
+
+### Fixed
+
+- **`latest` and `stable` in Zsh (#24):** Installed-version discovery no longer overwrites `PATH` through Zsh's `path` array, and an empty Cellar no longer aborts the lookup.
+- **Prompt hook reverting manual switches (#25):** The Bash `PROMPT_COMMAND` hook now acts only when the directory changes, so `phpvm use` inside a `.phpvmrc` project is no longer undone at the next prompt.
+- **`phpvm unload` in Zsh (#26):** Unload now reads Zsh's function table and removes every phpvm helper, including the dnf helpers.
+- **`PHPVM_BIN` in global mode (#28):** After `use`, `system`, or `auto` through the shell function, the calling shell exports `PHPVM_BIN` and clears its command hash.
+- **Fedora/RHEL switching (#29):** When no versioned binary exists, `phpvm use` switches the dnf module stream, syncs installed PHP packages onto it, and verifies the interpreter instead of failing on the always-present `alternatives` command.
+- **Homebrew unversioned formula (#30):** `list` and `latest` read the `php` formula's own binary rather than whichever PHP is linked, so the active marker and `(default)` annotation appear correctly.
+- **apt installs (#31):** apt errors are shown, the PPA hint appears only when the package has no install candidate, and FPM is no longer installed by default.
+- **Test isolation (#32):** Each BATS test keeps its mock PHP installations in its own directory instead of a shared `/tmp/opt/homebrew/Cellar`.
+- **Self-update integrity (#33):** Release bundles are verified against the published SHA-256 checksum, older releases are no longer installed as updates, and the installer rejects truncated or mismatched downloads.
+- **PATH entries with glob characters (#34):** Session PATH handling no longer expands entries such as `a*` against the current directory.
+- **Newest PHP on Homebrew:** The unversioned `php` formula's version is read from Homebrew metadata, so `ls-remote` lists it and `phpvm install` (including Composer-driven installs) can install it before it is present locally.
+- **Version ordering:** `latest`, Composer resolution, and the self-update downgrade guard compare each version component numerically, so `1.14.10` is newer than `1.14.9` and `8.2.10` newer than `8.2.9`.
+- **Composer constraints under older Bash:** The constraint reaches awk as an argument, so matching also works while a DEBUG trap is active (macOS Bash 3.2, bash-preexec).
+- **CI coverage (#35):** The integration job names the package manager it exercises (apt on Ubuntu, Homebrew on macOS) without installing unused Linuxbrew, and BATS publishes JUnit results.
+- **Developer documentation (#36):** `CLAUDE.md` and `install-bats.sh` describe the current layout, workflows, and test command.
+
+### Changed
+
+- **No-pin messages:** `use` and `install` now mention `composer.json` when no project pin is found.
+- **apt package set:** `phpvm install` on apt installs `phpX.Y-cli` and `phpX.Y-common`; set `PHPVM_APT_INSTALL_FPM=true` to restore the previous FPM install.
+
 ## [v1.13.0](https://github.com/Thavarshan/phpvm/compare/1.12.2...1.13.0) - 2026-09-29
 
 ### Added

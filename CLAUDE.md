@@ -12,7 +12,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Core Components
 
-- **`phpvm.sh`** - Main functionality (1000+ lines of bash)
+- **`phpvm.sh`** - Main functionality (~4,500 lines of bash)
   - PHP version installation and management
   - Cross-platform package manager detection
   - Version switching with symlink management
@@ -24,7 +24,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - Configures shell profile integration
   - Handles different shell types (bash/zsh)
 
-- **`versions/`** - Directory for PHP version metadata (currently empty)
+- **`completions/phpvm.bash`** - Bash tab completion, shipped with releases and installed to `$PHPVM_DIR/completions`
+
+- **`$PHPVM_DIR/versions/`** - Session-mode interpreter links (`versions/X.Y/session-<key>/bin/php`); the repository's `versions/` directory is a placeholder
 
 ### Package Manager Support
 
@@ -42,9 +44,14 @@ The tool detects and works with multiple package managers:
 - Active version tracking via `~/.phpvm/active_version`
 
 ### Auto-Switching
-- Detects `.phpvmrc` files in current/parent directories (up to 5 levels)
-- Automatically switches to specified PHP version
+- Detects `.phpvmrc` files in current/parent directories (up to 25 levels, `PHPVM_PHPVMRC_MAX_DEPTH`)
+- Automatically switches to specified PHP version on directory change
 - Handles corrupted/invalid `.phpvmrc` files gracefully
+
+### Project Pins
+- Without a version, `use`, `install`, `resolve`, `exec` and `run` read the nearest project pin (`phpvm_read_project_version`)
+- Each directory is checked for `.phpvmrc`, then for `config.platform.php` / `require.php` in `composer.json`
+- Composer constraints are matched in portable awk (`phpvm_filter_by_constraint`); keep it compatible with BSD awk, mawk and gawk
 
 ### Testing Framework
 - BATS (Bash Automated Testing System) test suite in `tests/` directory
@@ -143,17 +150,18 @@ phpvm/
 ├── CHANGELOG.md       # Release history
 ├── LICENSE           # MIT license
 ├── README.md         # User documentation
-├── TESTING.md        # Testing documentation (minimal)
+├── TESTING.md        # Testing documentation
 ├── assets/           # Project images
+├── completions/      # Bash tab completion
 ├── install-bats.sh   # BATS installation script
 ├── install.sh        # Main installation script
-├── phpvm.sh          # Core functionality (~1000 lines)
-├── versions/         # Version metadata directory
+├── phpvm.sh          # Core functionality (~4,500 lines)
+├── tests/            # BATS suites (01–08) and the real-PHP session smoke test
+├── versions/         # Placeholder (session links live in $PHPVM_DIR/versions)
 └── .github/          # GitHub workflows and templates
     └── workflows/
-        ├── test.yml  # Automated testing
-        ├── use.yml   # Usage testing
-        └── release.yml # Release automation
+        ├── ci.yml      # Lint, format, security, BATS, integration tests
+        └── release.yml # Session smoke test and tag-driven draft releases
 ```
 
 ## Environment Variables

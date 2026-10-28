@@ -14,7 +14,7 @@
 
 ```sh
 $ phpvm version
-phpvm version 1.13.0
+phpvm version 1.14.0
 
 PHP Version Manager for macOS and Linux
 Author: Jerome Thayananthajothy <tjthavarshan@gmail.com>
@@ -44,6 +44,7 @@ PHP 8.1.13
 - **Update phpvm in place** using `phpvm self-update` to pull the latest stable script version.
 - **Resolve version descriptors and aliases** to installed version numbers (`phpvm resolve`).
 - Auto-switch PHP versions based on project `.phpvmrc` (configurable depth via `PHPVM_PHPVMRC_MAX_DEPTH`).
+- **Composer-aware version detection** — `phpvm use`, `phpvm install`, and `phpvm resolve` read the PHP requirement from `composer.json` (`config.platform.php` or `require.php`) when no version is given.
 - Automatic directory-based switching via built-in cd hook (`PROMPT_COMMAND` for bash, `chpwd` for zsh).
 - **Auto-set `default` alias** on first `phpvm install` (matches nvm behaviour).
 - Alias management for versions (`phpvm alias`, `phpvm unalias`).
@@ -109,13 +110,13 @@ If the installation was successful, it should output the path to `phpvm`.
 
 | Command                                    | Description                                                               |
 | ------------------------------------------ | ------------------------------------------------------------------------- |
-| `phpvm install [version]`                  | Install a PHP version (reads `.phpvmrc` if no version given)              |
-| `phpvm use [version]`                      | Switch PHP version (reads `.phpvmrc` → default alias if no version given) |
+| `phpvm install [version]`                  | Install a PHP version (reads `.phpvmrc` or `composer.json` if omitted)    |
+| `phpvm use [version]`                      | Switch PHP version (`.phpvmrc` → `composer.json` → default alias)         |
 | `phpvm uninstall <version>`                | Remove a specific PHP version                                             |
 | `phpvm current`                            | Display the currently active PHP version                                  |
 | `phpvm which [version]`                    | Show the path to PHP binary for a version                                 |
-| `phpvm exec <version> <command> [args...]` | Run a command with a specific PHP version (subshell isolation)            |
-| `phpvm run <version> [script] [args...]`   | Run a PHP script with a specific version                                  |
+| `phpvm exec [version] <command> [args...]` | Run a command with a PHP version (defaults to the project pin)            |
+| `phpvm run [version] [script] [args...]`   | Run a PHP script with a PHP version (defaults to the project pin)         |
 | `phpvm deactivate`                         | Temporarily disable phpvm and restore PATH                                |
 | `phpvm unload`                             | Remove phpvm from the current shell session                               |
 | `phpvm system`                             | Switch to system/Homebrew default PHP                                     |
@@ -123,8 +124,8 @@ If the installation was successful, it should output the path to `phpvm`.
 | `phpvm list` or `phpvm ls`                 | List all installed PHP versions                                           |
 | `phpvm ls-remote [pattern]`                | List available remote PHP versions                                        |
 | `phpvm install latest-remote`               | Install the latest remote PHP version available                          |
-| `phpvm self-update`                         | Update phpvm to the latest stable release                                |
-| `phpvm resolve <version\|alias>`           | Resolve a version descriptor to an installed version                      |
+| `phpvm self-update [--force]`               | Update phpvm to the latest stable release (checksum-verified)            |
+| `phpvm resolve [version\|alias]`           | Resolve a version descriptor (or the project pin) to an installed version |
 | `phpvm alias [name] [ver]`                 | Create, update, or list version aliases                                   |
 | `phpvm unalias <name>`                     | Remove version alias                                                      |
 | `phpvm cache <dir\|clear>`                 | Show or clear the phpvm cache directory                                   |
@@ -247,7 +248,7 @@ phpvm use
 phpvm install
 ```
 
-`phpvm use` follows this fallback chain: `.phpvmrc` → `default` alias → error.
+`phpvm use` follows this fallback chain: `.phpvmrc` → `composer.json` PHP requirement → `default` alias → error.
 
 **Manual switching**: You can also trigger auto-switching explicitly:
 
@@ -261,6 +262,36 @@ Aliases can also be used in `.phpvmrc`:
 echo "default" > .phpvmrc
 phpvm auto
 ```
+
+### Composer Integration
+
+Most PHP projects already declare their PHP version in `composer.json`, so a `.phpvmrc` is optional. When no version is given, `phpvm use`, `phpvm install`, and `phpvm resolve` read the nearest project pin:
+
+1. Each directory, from the current one upwards, is checked for `.phpvmrc` first, then for a PHP requirement in `composer.json`. The closest directory wins.
+2. In `composer.json`, `config.platform.php` (the exact deployment target) takes precedence over `require.php`. A `composer.json` without a PHP requirement is skipped.
+3. The requirement is matched with Composer's constraint rules. `use` and `resolve` select the newest **installed** version that satisfies it; `install` selects the newest version **available** from your package manager.
+
+```json
+{
+    "require": {
+        "php": "^8.1 <8.4"
+    }
+}
+```
+
+```sh
+$ phpvm use
+Found PHP requirement '^8.1 <8.4' in composer.json; using 8.3
+Switching to PHP 8.3...
+Switched to PHP 8.3.
+
+$ phpvm resolve
+8.3
+```
+
+Supported constraint syntax: `^8.1`, `~8.2`, `~8.2.0`, `>=8.1`, `>8.1`, `<=8.3`, `<8.4`, `8.2.*`, `8.1 - 8.3`, exact versions such as `8.2.12`, AND (space or comma) and OR (`||`). `!=` clauses and stability flags such as `@dev` are ignored. A version matches when any of its patch releases would satisfy the constraint.
+
+If no installed version matches, `phpvm use` exits with code `4`; if no available version matches, `phpvm install` exits with code `3`. Requirements that use unsupported characters are ignored with a warning, and `phpvm use` falls back to the `default` alias. Automatic switching on `cd` and `phpvm auto` continue to use `.phpvmrc` only.
 
 ### Listing Installed Versions
 
@@ -374,6 +405,14 @@ phpvm exec 8.1 php script.php arg1 arg2
 
 Both commands resolve aliases and keywords (`default`, `latest`, `stable`) before execution.
 
+When the first argument is not a version, keyword, or alias, both commands use the project pin (`.phpvmrc` or `composer.json`), like `nvm exec` and `nvm run`. The message naming the pin goes to stderr, so the command's output stays clean:
+
+```sh
+# Inside a project that requires "php": "^8.2"
+phpvm exec composer install
+phpvm run script.php
+```
+
 ### Listing Available Remote Versions
 
 List PHP versions available for installation from your system package manager:
@@ -403,6 +442,9 @@ phpvm resolve latest     # → 8.3
 
 # Pass through a concrete version (if installed)
 phpvm resolve 8.1        # → 8.1
+
+# Resolve the current project's pin (.phpvmrc or composer.json)
+phpvm resolve            # → 8.3
 ```
 
 This is useful in CI scripts or tooling that needs to know which version an alias points to.
@@ -476,6 +518,7 @@ fi
 | `PHPVM_BIN`               | _(export)_ | Active PHP binary directory (set after version switch, unset on deactivate)              |
 | `PHPVM_AUTO_USE`          | `true`     | Enable automatic `.phpvmrc` detection when sourced                                       |
 | `PHPVM_PHPVMRC_MAX_DEPTH` | `25`       | Max parent directories to traverse when searching for `.phpvmrc`                         |
+| `PHPVM_APT_INSTALL_FPM`   | `false`    | On apt systems, also install `phpX.Y-fpm` (which starts a php-fpm service)               |
 | `PHPVM_DEBUG`             | `false`    | Enable debug logging with timestamps                                                     |
 | `NO_COLOR`                | _(unset)_  | Disable color output ([no-color.org](https://no-color.org/))                             |
 | `PHPVM_LOG_TIMESTAMPS`    | `false`    | Always show timestamps in log output                                                     |
