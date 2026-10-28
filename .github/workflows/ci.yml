@@ -213,7 +213,8 @@ jobs:
       - name: Run BATS Test Suite
         run: |
           echo "=== Running BATS Test Suite ==="
-          bats tests/ -t
+          mkdir -p test-results
+          bats --formatter tap --report-formatter junit --output test-results tests/
 
       - name: Upload Test Results
         if: always()
@@ -238,16 +239,6 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-
-      - name: Setup Homebrew (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential curl file git
-          NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-          echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.bashrc
-          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-          brew --version
 
       - name: Make Script Executable
         run: chmod +x ./phpvm.sh
@@ -295,10 +286,6 @@ jobs:
           echo "8.3" > test_project/.phpvmrc
 
           cd test_project
-          if [[ "${{ runner.os }}" == "Linux" ]]; then
-            eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" 2>/dev/null || true
-          fi
-
           ../phpvm.sh auto || echo "Auto-switch attempted"
           cd ..
           echo "✓ Auto-switch test completed"
@@ -314,27 +301,24 @@ jobs:
   # =============================================================================
   # PHP INSTALLATION & INTEGRATION TESTS
   # =============================================================================
+  # Real package-manager integration: apt + update-alternatives on Ubuntu,
+  # Homebrew on macOS. Linuxbrew is covered by the release session smoke test.
   php-integration:
-    name: 'PHP Integration (${{ matrix.os }})'
+    name: 'PHP Integration (${{ matrix.os }}, ${{ matrix.package_manager }})'
     runs-on: ${{ matrix.os }}
     needs: [bats-tests, core-tests]
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            package_manager: apt
+          - os: macos-latest
+            package_manager: brew
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-
-      - name: Setup Homebrew (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential curl file git
-          NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-          echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.bashrc
-          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 
       - name: Test Installation Script
         run: |
@@ -349,21 +333,15 @@ jobs:
       - name: Test PHP Installation Flow
         run: |
           chmod +x phpvm.sh
-          if [[ "${{ runner.os }}" == "Linux" ]]; then
-            eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-          fi
+          ./phpvm.sh info | grep -q "Package Manager: ${{ matrix.package_manager }}"
 
-          echo "=== Testing PHP Installation ==="
+          echo "=== Testing PHP Installation (${{ matrix.package_manager }}) ==="
           ./phpvm.sh install 8.3
           ./phpvm.sh use 8.3
           ./phpvm.sh list
 
       - name: Test Project Workflow
         run: |
-          if [[ "${{ runner.os }}" == "Linux" ]]; then
-            eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-          fi
-
           echo "=== Testing Project Workflow ==="
           mkdir -p test_project
           echo "8.3" > test_project/.phpvmrc

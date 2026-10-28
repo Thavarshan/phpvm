@@ -115,8 +115,8 @@ If the installation was successful, it should output the path to `phpvm`.
 | `phpvm uninstall <version>`                | Remove a specific PHP version                                             |
 | `phpvm current`                            | Display the currently active PHP version                                  |
 | `phpvm which [version]`                    | Show the path to PHP binary for a version                                 |
-| `phpvm exec <version> <command> [args...]` | Run a command with a specific PHP version (subshell isolation)            |
-| `phpvm run <version> [script] [args...]`   | Run a PHP script with a specific version                                  |
+| `phpvm exec [version] <command> [args...]` | Run a command with a PHP version (defaults to the project pin)            |
+| `phpvm run [version] [script] [args...]`   | Run a PHP script with a PHP version (defaults to the project pin)         |
 | `phpvm deactivate`                         | Temporarily disable phpvm and restore PATH                                |
 | `phpvm unload`                             | Remove phpvm from the current shell session                               |
 | `phpvm system`                             | Switch to system/Homebrew default PHP                                     |
@@ -124,7 +124,7 @@ If the installation was successful, it should output the path to `phpvm`.
 | `phpvm list` or `phpvm ls`                 | List all installed PHP versions                                           |
 | `phpvm ls-remote [pattern]`                | List available remote PHP versions                                        |
 | `phpvm install latest-remote`               | Install the latest remote PHP version available                          |
-| `phpvm self-update`                         | Update phpvm to the latest stable release                                |
+| `phpvm self-update [--force]`               | Update phpvm to the latest stable release (checksum-verified)            |
 | `phpvm resolve [version\|alias]`           | Resolve a version descriptor (or the project pin) to an installed version |
 | `phpvm alias [name] [ver]`                 | Create, update, or list version aliases                                   |
 | `phpvm unalias <name>`                     | Remove version alias                                                      |
@@ -405,6 +405,14 @@ phpvm exec 8.1 php script.php arg1 arg2
 
 Both commands resolve aliases and keywords (`default`, `latest`, `stable`) before execution.
 
+When the first argument is not a version, keyword, or alias, both commands use the project pin (`.phpvmrc` or `composer.json`), like `nvm exec` and `nvm run`. The message naming the pin goes to stderr, so the command's output stays clean:
+
+```sh
+# Inside a project that requires "php": "^8.2"
+phpvm exec composer install
+phpvm run script.php
+```
+
 ### Listing Available Remote Versions
 
 List PHP versions available for installation from your system package manager:
@@ -510,6 +518,7 @@ fi
 | `PHPVM_BIN`               | _(export)_ | Active PHP binary directory (set after version switch, unset on deactivate)              |
 | `PHPVM_AUTO_USE`          | `true`     | Enable automatic `.phpvmrc` detection when sourced                                       |
 | `PHPVM_PHPVMRC_MAX_DEPTH` | `25`       | Max parent directories to traverse when searching for `.phpvmrc`                         |
+| `PHPVM_APT_INSTALL_FPM`   | `false`    | On apt systems, also install `phpX.Y-fpm` (which starts a php-fpm service)               |
 | `PHPVM_DEBUG`             | `false`    | Enable debug logging with timestamps                                                     |
 | `NO_COLOR`                | _(unset)_  | Disable color output ([no-color.org](https://no-color.org/))                             |
 | `PHPVM_LOG_TIMESTAMPS`    | `false`    | Always show timestamps in log output                                                     |

@@ -1150,16 +1150,16 @@ phpvm_session_strip_path() {
             else result="$result:$entry"; fi
         done
     else
-        local old_ifs="$IFS"
-        IFS=:
-        for entry in $PATH; do
+        # Split with read so entries such as "a*" are not glob-expanded
+        local -a entries
+        IFS=: read -r -a entries <<< "$PATH"
+        for entry in "${entries[@]}"; do
             if [ -n "$remove" ] && [ "$entry" = "$remove" ]; then continue; fi
             if [ "$first" = true ]; then
                 result="$entry"
                 first=false
             else result="$result:$entry"; fi
         done
-        IFS="$old_ifs"
     fi
     printf '%s\n' "$result"
 }
@@ -1328,7 +1328,8 @@ phpvm_installed_versions() {
                 if [ -d "$cellar_dir" ]; then
                     version=$(basename "$cellar_dir")
                     if [ "$version" = "php" ]; then
-                        version=$(get_installed_php_version)
+                        # Read the formula's own binary, not whichever PHP is linked
+                        version=$(brew_php_major_minor 2> /dev/null) || version=""
                     else
                         version=${version#php@}
                     fi
@@ -1493,6 +1494,48 @@ dnf_stream_enabled() {
         $1 == "php" && $2 == s { if (index($3, "[e]") || index($4, "[e]") || index($0, "[e]")) found=1 }
         END { exit (found ? 0 : 1) }
     '
+}
+
+# Switch the dnf php module stream so /usr/bin/php provides the requested version
+# Installed PHP packages are synced onto the enabled stream (upgrade or downgrade).
+# Usage: dnf_switch_php_stream <X.Y>
+dnf_switch_php_stream() {
+    local version="$1"
+    local stream
+
+    stream=$(dnf_resolve_php_stream "$version")
+    if [ -z "$stream" ]; then
+        phpvm_err "No php module stream found for PHP $version."
+        suggest_repository_setup "$version"
+        return "$PHPVM_EXIT_NOT_FOUND"
+    fi
+
+    if dnf_stream_enabled "$stream"; then
+        phpvm_debug "Module stream php:${stream} already enabled"
+    else
+        if ! run_with_sudo dnf module reset php -y 2> /dev/null; then
+            phpvm_warn "Failed to reset PHP module"
+        fi
+        if ! run_with_sudo dnf module enable "php:${stream}" -y; then
+            phpvm_err "Failed to enable php:${stream} module stream."
+            return "$PHPVM_EXIT_ERROR"
+        fi
+    fi
+
+    if ! phpvm_resolve_php_binary "$version" > /dev/null 2>&1; then
+        phpvm_echo "Syncing installed PHP packages to php:${stream}..."
+        if ! run_with_sudo dnf distro-sync -y 'php-*'; then
+            phpvm_err "Failed to sync PHP packages to php:${stream}."
+            return "$PHPVM_EXIT_ERROR"
+        fi
+    fi
+
+    if ! phpvm_resolve_php_binary "$version" > /dev/null; then
+        phpvm_err "PHP $version is not installed from php:${stream}."
+        phpvm_warn "Install with: phpvm install $version"
+        return "$PHPVM_EXIT_NOT_INSTALLED"
+    fi
+    return "$PHPVM_EXIT_SUCCESS"
 }
 
 # Detect if PHP packages are available in current repositories
@@ -1864,21 +1907,28 @@ install_php_apt() {
         phpvm_warn "Failed to update package list, continuing anyway..."
     }
 
-    # Ubuntu/Debian with ondrej/sury PPA is the standard approach
-    # Install both CLI and common extensions
-    phpvm_echo "Installing PHP ${normalized_version} (cli + common extensions)..."
-    if ! run_with_sudo apt-get install -y \
-        "php${normalized_version}-cli" \
-        "php${normalized_version}-common" \
-        "php${normalized_version}-fpm" 2> /dev/null; then
-
-        phpvm_err "Failed to install PHP ${normalized_version}."
+    # Only suggest the PPA when apt has no candidate for the package
+    if ! pkg_search_php "$normalized_version"; then
+        phpvm_err "php${normalized_version}-cli is not available from your apt sources."
         phpvm_warn ""
         phpvm_warn "You likely need to add the ondrej/php PPA:"
         phpvm_warn "  sudo add-apt-repository ppa:ondrej/php"
         phpvm_warn "  sudo apt-get update"
         phpvm_warn "  phpvm install ${normalized_version}"
         return "$PHPVM_EXIT_NOT_FOUND"
+    fi
+
+    # Install the CLI and common extensions; FPM starts a system service, so it
+    # is only added on request
+    local packages=("php${normalized_version}-cli" "php${normalized_version}-common")
+    if [ "${PHPVM_APT_INSTALL_FPM:-false}" = "true" ]; then
+        packages+=("php${normalized_version}-fpm")
+    fi
+
+    phpvm_echo "Installing PHP ${normalized_version} (${packages[*]})..."
+    if ! run_with_sudo apt-get install -y "${packages[@]}"; then
+        phpvm_err "Failed to install PHP ${normalized_version}. See the apt-get output above for details."
+        return "$PHPVM_EXIT_ERROR"
     fi
 
     return "$PHPVM_EXIT_SUCCESS"
@@ -2317,15 +2367,17 @@ switch_to_version_php() {
         fi
         ;;
     apt | dnf | yum | pacman)
-        # Preferred order: update-alternatives/alternatives → Arch special-case → dnf module → fail
-        if command_exists update-alternatives || command_exists alternatives; then
-            # update-alternatives or alternatives is available - use it
-            if php_binary=$(linux_find_php_binary "$normalized_version"); then
-                linux_set_php_alternative "$php_binary" "$normalized_version" || return "$PHPVM_EXIT_ERROR"
-            else
-                phpvm_err "PHP binary for version $normalized_version not found. Tried: /usr/bin/php$normalized_version"
-                return "$PHPVM_EXIT_NOT_INSTALLED"
-            fi
+        # Preferred order: versioned binary via alternatives → dnf module stream →
+        # Arch special-case → fail. Fedora/RHEL always ship 'alternatives', but
+        # module-stream installs provide only /usr/bin/php, so they switch via dnf.
+        php_binary=$(get_php_binary_path "$normalized_version" 2> /dev/null) || php_binary=""
+        if [ -x "$php_binary" ] && { command_exists update-alternatives || command_exists alternatives; }; then
+            linux_set_php_alternative "$php_binary" "$normalized_version" || return "$PHPVM_EXIT_ERROR"
+        elif [ "$PKG_MANAGER" = "dnf" ] && command_exists dnf; then
+            dnf_switch_php_stream "$normalized_version" || return $?
+        elif command_exists update-alternatives || command_exists alternatives; then
+            phpvm_err "PHP binary for version $normalized_version not found. Tried: /usr/bin/php$normalized_version"
+            return "$PHPVM_EXIT_NOT_INSTALLED"
         elif [ "$PHPVM_LINUX_DISTRO" = "arch" ] || [ "$PHPVM_LINUX_DISTRO" = "manjaro" ]; then
             # Arch Linux typically has a single PHP version
             if [ -x "/usr/bin/php" ]; then
@@ -2338,39 +2390,6 @@ switch_to_version_php() {
                 fi
             else
                 phpvm_err "No PHP binary found. Install with: sudo pacman -S php"
-                return "$PHPVM_EXIT_NOT_INSTALLED"
-            fi
-        elif [ "$PKG_MANAGER" = "dnf" ]; then
-            # Try dnf module approach for RHEL/Fedora
-            if command_exists dnf && dnf module list php > /dev/null 2>&1; then
-                local use_stream
-                use_stream=$(dnf_resolve_php_stream "$normalized_version")
-                if [ -n "$use_stream" ]; then
-                    phpvm_debug "Attempting to enable php:${use_stream} module"
-                    if dnf_stream_enabled "$use_stream"; then
-                        phpvm_debug "Module stream php:${use_stream} already enabled"
-                    else
-                        if ! run_with_sudo dnf module reset php -y 2> /dev/null; then
-                            phpvm_warn "Failed to reset PHP module"
-                        fi
-                        if ! run_with_sudo dnf module enable "php:${use_stream}" -y; then
-                            phpvm_warn "Failed to enable php:${use_stream} module."
-                        fi
-                    fi
-                else
-                    phpvm_warn "No php module stream found for PHP $normalized_version"
-                fi
-            fi
-            # After module enable, check if binary exists
-            if php_binary=$(linux_find_php_binary "$normalized_version"); then
-                if [ -x "$php_binary" ]; then
-                    phpvm_debug "Using PHP binary: $php_binary"
-                else
-                    phpvm_err "PHP binary for version $normalized_version not found or not executable."
-                    return "$PHPVM_EXIT_NOT_INSTALLED"
-                fi
-            else
-                phpvm_err "PHP binary for version $normalized_version not found. Tried: /usr/bin/php$normalized_version"
                 return "$PHPVM_EXIT_NOT_INSTALLED"
             fi
         else
@@ -2792,8 +2811,10 @@ phpvm_validate_constraint() {
 # (@dev) are ignored.
 # Usage: phpvm_filter_by_constraint <constraint>
 # Returns: 0 on success, 2 if the constraint has no usable clause
+# The constraint is passed with -v: a "VAR=value command" prefix is dropped by
+# older Bash while a DEBUG trap is active (bats, bash-preexec).
 phpvm_filter_by_constraint() {
-    PHPVM_CONSTRAINT="$1" command awk '
+    command awk -v spec="$1" '
         function enc(major, minor, patch) {
             return major * 1000000 + minor * 1000 + patch
         }
@@ -2865,7 +2886,6 @@ phpvm_filter_by_constraint() {
         }
         BEGIN {
             INF = 1e15
-            spec = ENVIRON["PHPVM_CONSTRAINT"]
             gsub(/\|\|/, "|", spec)
             groups = split(spec, alternatives, "|")
             usable = 0
@@ -3055,6 +3075,13 @@ phpvm_cd_hook() {
     local version
     local current
 
+    # Bash runs this from PROMPT_COMMAND before every prompt; act only when the
+    # directory changes so a manual 'phpvm use' is not reverted
+    if [ "${PHPVM_LAST_HOOK_PWD:-}" = "$PWD" ]; then
+        return 0
+    fi
+    PHPVM_LAST_HOOK_PWD="$PWD"
+
     if ! version=$(phpvm_read_phpvmrc_version); then
         return 0
     fi
@@ -3178,7 +3205,8 @@ list_installed_versions() {
                 if [ -d "$dir" ]; then
                     base_name=$(basename "$dir")
                     if [ "$base_name" = "php" ]; then
-                        version=$(get_installed_php_version)
+                        # Read the formula's own binary, not whichever PHP is linked
+                        version=$(brew_php_major_minor 2> /dev/null) || continue
                     else
                         version=${base_name#php@}
                     fi
@@ -3263,8 +3291,8 @@ Usage:
   phpvm uninstall <version> Remove specified PHP version
   phpvm current             Show currently active PHP version
   phpvm which [version]     Show path to PHP binary
-  phpvm exec <ver> <cmd>    Execute command with specific PHP version
-  phpvm run <ver> [script]  Run PHP script with specific version
+  phpvm exec [ver] <cmd>    Execute command with specific PHP version
+  phpvm run [ver] [script]  Run PHP script with specific version
   phpvm deactivate          Temporarily disable phpvm management
   phpvm unload              Remove phpvm from current shell session
   phpvm system              Switch to system PHP version
@@ -3275,7 +3303,7 @@ Usage:
   phpvm alias [name] [ver]  Create, update, or list version aliases
   phpvm unalias <name>      Remove version alias
   phpvm cache <dir|clear>   Manage cache directory
-  phpvm self-update         Update phpvm to the latest stable version
+  phpvm self-update         Update phpvm to the latest stable version (--force to reinstall)
   phpvm help                Show this help message
   phpvm info                Show system information for debugging
   phpvm version             Show version information
@@ -3386,6 +3414,41 @@ phpvm_download_url_to_file() {
     return "$PHPVM_EXIT_ERROR"
 }
 
+# Print the SHA-256 digest of a file
+phpvm_sha256() {
+    if command_exists sha256sum; then
+        command sha256sum "$1" | command awk '{print $1}'
+    elif command_exists shasum; then
+        command shasum -a 256 "$1" | command awk '{print $1}'
+    else
+        return 1
+    fi
+}
+
+# Verify a file against a "<digest>  <name>" checksum file
+# Usage: phpvm_verify_checksum <file> <checksum-file>
+phpvm_verify_checksum() {
+    local file="$1"
+    local checksum_file="$2"
+    local expected
+    local actual
+
+    expected=$(command awk 'NR == 1 {print tolower($1)}' "$checksum_file" 2> /dev/null)
+    if ! printf '%s\n' "$expected" | command grep -Eq '^[0-9a-f]{64}$'; then
+        phpvm_err "Release checksum is missing or malformed."
+        return 1
+    fi
+    if ! actual=$(phpvm_sha256 "$file"); then
+        phpvm_err "sha256sum or shasum is required to verify the update."
+        return 1
+    fi
+    if [ "$actual" != "$expected" ]; then
+        phpvm_err "Checksum mismatch for the downloaded release bundle."
+        return 1
+    fi
+    return 0
+}
+
 phpvm_extract_version_from_file() {
     local file="$1"
     local version
@@ -3442,6 +3505,18 @@ phpvm_self_update() {
     local remote_version
     local target_script
     local bundled=false
+    local force=false
+    local checksum_file
+
+    case "${1:-}" in
+    "") ;;
+    --force) force=true ;;
+    *)
+        phpvm_err "Unknown self-update option: $1"
+        phpvm_warn "Usage: phpvm self-update [--force]"
+        return "$PHPVM_EXIT_INVALID_ARG"
+        ;;
+    esac
 
     target_script=$(phpvm_get_self_update_target) || return "$PHPVM_EXIT_ERROR"
     if [ -z "$target_script" ]; then
@@ -3480,6 +3555,19 @@ phpvm_self_update() {
     if [ -n "${PHPVM_SELF_UPDATE_URL:-}" ] || { phpvm_is_test_mode && [ -n "${PHPVM_SELF_UPDATE_TEST_SOURCE:-}" ]; }; then
         new_script="$tmp_file"
     else
+        # Release bundles are published with a SHA-256 checksum next to them
+        checksum_file="$tmp_dir/download.sha256"
+        if phpvm_is_test_mode && [ -n "${PHPVM_SELF_UPDATE_TEST_BUNDLE:-}" ]; then
+            command cp "${PHPVM_SELF_UPDATE_TEST_BUNDLE}.sha256" "$checksum_file" 2> /dev/null || : > "$checksum_file"
+        elif ! phpvm_download_url_to_file "${source_url}.sha256" "$checksum_file"; then
+            rm -rf "$tmp_dir"
+            phpvm_err "Failed to download the release checksum from ${source_url}.sha256"
+            return "$PHPVM_EXIT_ERROR"
+        fi
+        if ! phpvm_verify_checksum "$tmp_file" "$checksum_file"; then
+            rm -rf "$tmp_dir"
+            return "$PHPVM_EXIT_ERROR"
+        fi
         if ! command tar -xzf "$tmp_file" -C "$tmp_dir"; then
             rm -rf "$tmp_dir"
             phpvm_err "Downloaded phpvm release bundle is invalid."
@@ -3506,10 +3594,20 @@ phpvm_self_update() {
         return "$PHPVM_EXIT_ERROR"
     fi
 
-    if [ "$remote_version" = "$PHPVM_VERSION" ] && { [ "$bundled" = false ] || [ -r "$target_completion" ]; }; then
-        rm -rf "$tmp_dir"
-        phpvm_echo "You are already on the latest version: v$PHPVM_VERSION."
-        return "$PHPVM_EXIT_SUCCESS"
+    if [ "$force" = false ]; then
+        if [ "$remote_version" = "$PHPVM_VERSION" ] && { [ "$bundled" = false ] || [ -r "$target_completion" ]; }; then
+            rm -rf "$tmp_dir"
+            phpvm_echo "You are already on the latest version: v$PHPVM_VERSION."
+            return "$PHPVM_EXIT_SUCCESS"
+        fi
+        # Never replace a newer local copy with an older release by default
+        if [ "$remote_version" != "$PHPVM_VERSION" ] &&
+            [ "$(printf '%s\n%s\n' "$remote_version" "$PHPVM_VERSION" | phpvm_latest_from_list)" = "$PHPVM_VERSION" ]; then
+            rm -rf "$tmp_dir"
+            phpvm_warn "Installed phpvm v$PHPVM_VERSION is newer than the latest release v$remote_version."
+            phpvm_warn "Run 'phpvm self-update --force' to install v$remote_version anyway."
+            return "$PHPVM_EXIT_SUCCESS"
+        fi
     fi
 
     backup_script="$tmp_dir/backup-script"
@@ -3759,21 +3857,58 @@ uninstall_php() {
 # Command execution helpers
 # ============================================================================
 
+# Return 0 if an argument names a PHP version, keyword, or existing alias
+# Usage: phpvm_is_version_descriptor <argument>
+phpvm_is_version_descriptor() {
+    case "$1" in
+    system | latest | stable | latest-remote | latest-available) return 0 ;;
+    esac
+    is_valid_version_format "$1" && return 0
+    phpvm_validate_alias_name "$1" && [ -f "$PHPVM_DIR/alias/$1" ]
+}
+
+# Print the project's pinned version for exec and run when no version is given
+# The source message goes to stderr so the command's own output stays clean.
+# Usage: phpvm_exec_project_version <exec|run>
+phpvm_exec_project_version() {
+    local project
+    local result
+
+    project=$(phpvm_read_project_version installed)
+    result=$?
+    if [ "$result" -eq 0 ]; then
+        phpvm_echo "${project#*$'\n'}" >&2
+        printf '%s\n' "${project%%$'\n'*}"
+        return 0
+    fi
+    if [ "$result" -eq 1 ]; then
+        phpvm_err "Missing version argument and no .phpvmrc or composer.json PHP requirement found."
+        if [ "$1" = "run" ]; then
+            phpvm_warn "Usage: phpvm run [version] [script] [args...]"
+        else
+            phpvm_warn "Usage: phpvm exec [version] <command> [args...]"
+        fi
+        return "$PHPVM_EXIT_INVALID_ARG"
+    fi
+    return "$result"
+}
+
 # Execute command with specific PHP version without globally switching
-# Usage: phpvm_exec <version> <command> [args...]
+# Without a version argument, the project's .phpvmrc or composer.json is used.
+# Usage: phpvm_exec [version] <command> [args...]
 # Example: phpvm exec 8.2 composer install
 phpvm_exec() {
-    local version="$1"
+    local version
     local normalized_version
     local php_bin_dir
     local php_binary
 
-    if [ -z "$version" ]; then
-        phpvm_err "Missing version argument."
-        phpvm_warn "Usage: phpvm exec <version> <command> [args...]"
-        return "$PHPVM_EXIT_INVALID_ARG"
+    if [ "$#" -gt 0 ] && phpvm_is_version_descriptor "$1"; then
+        version="$1"
+        shift
+    else
+        version=$(phpvm_exec_project_version exec) || return $?
     fi
-    shift
 
     if [ "$#" -eq 0 ]; then
         phpvm_err "Missing command to execute."
@@ -3831,17 +3966,18 @@ phpvm_exec() {
 }
 
 # Run PHP script with specific version
-# Usage: phpvm_run <version> [script] [args...]
+# Without a version argument, the project's .phpvmrc or composer.json is used.
+# Usage: phpvm_run [version] [script] [args...]
 # Example: phpvm run 8.1 script.php arg1 arg2
 phpvm_run() {
-    local version="$1"
+    local version
 
-    if [ -z "$version" ]; then
-        phpvm_err "Missing version argument."
-        phpvm_warn "Usage: phpvm run <version> [script] [args...]"
-        return "$PHPVM_EXIT_INVALID_ARG"
+    if [ "$#" -gt 0 ] && phpvm_is_version_descriptor "$1"; then
+        version="$1"
+        shift
+    else
+        version=$(phpvm_exec_project_version run) || return $?
     fi
-    shift
 
     # Sugar: prepend 'php' to the command and delegate to exec
     phpvm_exec "$version" php "$@"
@@ -4055,11 +4191,18 @@ phpvm_unload() {
         chpwd_functions=("${new_funcs[@]}")
     fi
 
-    # Unset all phpvm functions
+    # Unset all phpvm functions. Zsh's declare -F lists floating-point
+    # parameters, so read Zsh's function table instead.
     local func_name
+    local func_names
+    if [ -n "${ZSH_VERSION:-}" ]; then
+        eval 'func_names=$(print -rl -- ${(k)functions})'
+    else
+        func_names=$(declare -F | command awk '{print $3}')
+    fi
     while IFS= read -r func_name; do
         unset -f "$func_name" 2> /dev/null
-    done < <(declare -F | command awk '{print $3}' | command grep -E '^(phpvm_|phpvm$|main$|command_exists$|run_with_sudo$|log_with_timestamp$|set_active_version$|update_current_symlink$|create_directories$|ensure_phpvm_dirs$|detect_system$|get_os_info$|sanitize_input$|is_valid_version_format$|validate_php_version$|get_php_package_name$|get_php_binary_path$|is_php_package_installed$|pkg_install_php$|pkg_uninstall_php$|pkg_search_php$|brew_|linux_|install_php|uninstall_php$|use_php_version$|switch_to_|system_php_version$|list_installed_versions$|print_help$|print_version$|print_system_info$|find_phpvmrc$|auto_switch_php_version$|check_remi_repository$|detect_php_availability$|suggest_repository_setup$|get_installed_php_version$)')
+    done < <(printf '%s\n' "$func_names" | command grep -E '^(phpvm_|phpvm$|main$|command_exists$|run_with_sudo$|log_with_timestamp$|set_active_version$|update_current_symlink$|create_directories$|ensure_phpvm_dirs$|detect_system$|get_os_info$|sanitize_input$|is_valid_version_format$|validate_php_version$|get_php_package_name$|get_php_binary_path$|is_php_package_installed$|pkg_install_php$|pkg_uninstall_php$|pkg_search_php$|brew_|linux_|dnf_|install_php|uninstall_php$|use_php_version$|switch_to_|system_php_version$|list_installed_versions$|print_help$|print_version$|print_system_info$|find_phpvmrc$|auto_switch_php_version$|check_remi_repository$|detect_php_availability$|suggest_repository_setup$|get_installed_php_version$|_dnf_enable_repo_cmd$)')
 
     unset -f phpvm 2> /dev/null || true
 
@@ -4183,7 +4326,7 @@ main() {
         exit "$PHPVM_EXIT_SUCCESS"
         ;;
     self-update)
-        phpvm_self_update
+        phpvm_self_update "$@"
         exit "$?"
         ;;
     unload)
@@ -4283,22 +4426,10 @@ main() {
         exit "$PHPVM_EXIT_SUCCESS"
         ;;
     exec)
-        if [ "$#" -eq 0 ]; then
-            local rc_version
-            if rc_version=$(phpvm_read_phpvmrc_version); then
-                phpvm_echo "Found '$rc_version' in .phpvmrc"
-            fi
-        fi
         phpvm_exec "$@"
         exit "$?"
         ;;
     run)
-        if [ "$#" -eq 0 ]; then
-            local rc_version
-            if rc_version=$(phpvm_read_phpvmrc_version); then
-                phpvm_echo "Found '$rc_version' in .phpvmrc"
-            fi
-        fi
         phpvm_run "$@"
         exit "$?"
         ;;
@@ -4319,7 +4450,7 @@ main() {
         exit "$?"
         ;;
     self-update)
-        phpvm_self_update
+        phpvm_self_update "$@"
         exit "$?"
         ;;
     *)
@@ -4392,8 +4523,31 @@ phpvm() {
         phpvm_err "Cannot locate phpvm.sh. Set PHPVM_DIR or reinstall phpvm."
         return "$PHPVM_EXIT_FILE_ERROR"
     fi
+    local result
     command "$PHPVM_SCRIPT_PATH" "$@"
-    return $?
+    result=$?
+
+    # A child process cannot export into this shell, so mirror global switches
+    if [ "$result" -eq 0 ] && [ "$PHPVM_SWITCH_MODE" = "global" ]; then
+        case "$command_name" in
+        use | system | auto) phpvm_sync_global_shell ;;
+        esac
+    fi
+    return "$result"
+}
+
+# Refresh this shell after a global switch made by the phpvm executable
+# Exports PHPVM_BIN for the active interpreter and clears the command hash.
+phpvm_sync_global_shell() {
+    local php_path
+
+    command hash -r 2> /dev/null || true
+    php_path=$(command "$PHPVM_SCRIPT_PATH" which 2> /dev/null) || php_path=""
+    if [ -n "$php_path" ]; then
+        export PHPVM_BIN="$(dirname "$php_path")"
+    else
+        unset PHPVM_BIN
+    fi
 }
 
 # Safe main execution with error handling

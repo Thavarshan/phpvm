@@ -102,6 +102,14 @@
             exit 1
         }
 
+        # Reject truncated or mismatched downloads before installing them
+        if ! grep -q "^PHPVM_VERSION=\"$PHPVM_RELEASE_VERSION\"\$" "$script_tmp" ||
+            { phpvm_has bash && ! bash -n "$script_tmp"; }; then
+            rm -f "$script_tmp" "$completion_tmp"
+            phpvm_err "Downloaded phpvm script is not a valid v$PHPVM_RELEASE_VERSION release"
+            exit 1
+        fi
+
         mkdir -p "$INSTALL_DIR/bin" "$INSTALL_DIR/completions"
         chmod +x "$script_tmp"
         mv "$script_tmp" "$INSTALL_DIR/phpvm.sh"

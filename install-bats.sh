@@ -76,7 +76,7 @@ if command -v bats >/dev/null 2>&1; then
     echo "Version information:"
     bats --version
     echo ""
-    echo "To run phpvm tests, use: bats test_phpvm.bats"
+    echo "To run phpvm tests, use: bats tests/"
 else
     echo "BATS installation failed."
     exit 1

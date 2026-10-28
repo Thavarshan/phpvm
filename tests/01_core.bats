@@ -106,6 +106,7 @@ PHPVM_VERSION="1.14.1"
 EOF
     printf 'complete -W "use install" phpvm\n' > "$release_dir/completions/phpvm.bash"
     tar -czf "$bundle" -C "$release_dir" phpvm.sh completions
+    write_sha256 "$bundle"
     printf '#!/bin/bash\nPHPVM_VERSION="1.14.0"\n' > "$target_file"
 
     run env PHPVM_TEST_MODE=true PHPVM_SELF_UPDATE_TEST_BUNDLE="$bundle" PHPVM_SELF_UPDATE_DEST="$target_file" bash "$BATS_TEST_DIRNAME/../phpvm.sh" self-update
@@ -253,6 +254,7 @@ EOF
     printf '#!/bin/bash\nPHPVM_VERSION="99.0.0"\n' > "$release_dir/phpvm.sh"
     printf 'new completion\n' > "$release_dir/completions/phpvm.bash"
     tar -czf "$TEST_DIR/release.tar.gz" -C "$release_dir" phpvm.sh completions
+    write_sha256 "$TEST_DIR/release.tar.gz"
     printf 'original script\n' > "$TEST_DIR/installed.sh"
     chmod 755 "$TEST_DIR/installed.sh"
     printf 'original completion\n' > "$PHPVM_DIR/completions/phpvm.bash"

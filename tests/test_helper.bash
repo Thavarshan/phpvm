@@ -30,6 +30,18 @@ teardown() {
     fi
 }
 
+# Write a "<digest>  <name>" SHA-256 file next to a release bundle
+write_sha256() {
+    local file="$1"
+    local digest
+    if command -v sha256sum > /dev/null 2>&1; then
+        digest=$(sha256sum "$file" | awk '{print $1}')
+    else
+        digest=$(shasum -a 256 "$file" | awk '{print $1}')
+    fi
+    printf '%s  %s\n' "$digest" "$(basename "$file")" > "$file.sha256"
+}
+
 # Helper function to create mock PHP installation
 create_mock_php() {
     local version="$1"
