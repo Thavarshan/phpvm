@@ -85,11 +85,16 @@ stub_command() {
 
 # --- #28: PHPVM_BIN in global mode ---
 
+@test "the sourced function can execute the checkout's phpvm.sh" {
+    # The function dispatches most commands by executing PHPVM_SCRIPT_PATH
+    [ -x "$BATS_TEST_DIRNAME/../phpvm.sh" ]
+    run phpvm version
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "phpvm version" ]]
+}
+
 @test "global use through the shell function exports PHPVM_BIN (#28)" {
     install_php 8.2
-    cp "$BATS_TEST_DIRNAME/../phpvm.sh" "$TEST_DIR/phpvm.sh"
-    chmod +x "$TEST_DIR/phpvm.sh"
-    PHPVM_SCRIPT_PATH="$TEST_DIR/phpvm.sh"
     unset PHPVM_BIN
 
     phpvm use 8.2 > /dev/null
