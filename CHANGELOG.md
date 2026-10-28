@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+## [v1.15.0](https://github.com/Thavarshan/phpvm/compare/1.14.0...1.15.0) - 2026-10-28
+
+### Added
+
+- **Zsh tab completion (#38):** Sourcing phpvm in Zsh with the completion system loaded registers the existing completion through `bashcompinit`, as nvm does. Version completion now lists installed versions for every supported package manager, not only Homebrew, and covers `ls`, `reinstall-extensions`, `install --reinstall-extensions-from`, and `self-update --force`.
+- **`phpvm ls <pattern>` (#39):** Filter installed versions by whole version components (`phpvm ls 8`, `phpvm ls 8.2`), by alias (`phpvm ls default`), or to `system`. Exits with code `3` when nothing matches.
+- **Reinstall extensions from another version (#40):** `phpvm install 8.4 --reinstall-extensions-from=8.3` and `phpvm reinstall-extensions <from> [to]` install the extensions one version loads (from `php -m`) into another, like nvm's `--reinstall-packages-from`. apt installs the matching `phpX.Y-<ext>` packages; Homebrew uses the target version's `pecl`; other package managers list what to install.
+- **Automatic switching from composer.json (#41):** Set `PHPVM_AUTO_USE_COMPOSER=true` to let startup, the cd hook, and `phpvm auto` use the nearest `.phpvmrc` or `composer.json` PHP requirement. The default remains `.phpvmrc` only.
+
+### Fixed
+
+- **CHANGELOG dates and links (#42):** Release headings use the date each GitHub release was published, and the 0.0.1 entry links to its commit history instead of a non-existent `0.0.0` tag.
+- **Unload leftovers:** `phpvm unload` also removes the completion registration and its helper functions.
+
+### Changed
+
+- **`phpvm install` arguments:** Unknown options and extra version arguments are rejected with exit code `2` instead of being ignored.
+
 ## [v1.14.0](https://github.com/Thavarshan/phpvm/compare/1.13.0...1.14.0) - 2026-10-28
 
 ### Added
@@ -36,7 +54,7 @@
 - **No-pin messages:** `use` and `install` now mention `composer.json` when no project pin is found.
 - **apt package set:** `phpvm install` on apt installs `phpX.Y-cli` and `phpX.Y-common`; set `PHPVM_APT_INSTALL_FPM=true` to restore the previous FPM install.
 
-## [v1.13.0](https://github.com/Thavarshan/phpvm/compare/1.12.2...1.13.0) - 2026-09-29
+## [v1.13.0](https://github.com/Thavarshan/phpvm/compare/1.12.2...1.13.0) - 2026-09-30
 
 ### Added
 
@@ -246,7 +264,7 @@
 - **Version bump:** Updated to v1.9.0.
 - **All tests passing:** 51 BATS tests pass (added 4 security tests for path traversal protection).
 
-## [v1.8.0](https://github.com/Thavarshan/phpvm/compare/1.7.0...1.8.0) - 2026-01-12
+## [v1.8.0](https://github.com/Thavarshan/phpvm/compare/1.7.0...1.8.0) - 2026-01-15
 
 ### Added
 
@@ -273,7 +291,7 @@
 - **Alias helper utilities:** Added alias listing helper and alias resolution logic.
 - **Test coverage:** Extended BATS test suite to cover alias functionality and all core features.
 
-## [v1.7.0](https://github.com/Thavarshan/phpvm/compare/1.6.0...1.7.0) - 2025-12-10
+## [v1.7.0](https://github.com/Thavarshan/phpvm/compare/1.6.0...1.7.0) - 2025-12-11
 
 ### Added
 
@@ -307,7 +325,7 @@
   - `phpvm_deactivate()` - Disables phpvm temporarily
 - **Expanded test suite:** Added tests for `phpvm_current`, `phpvm_which`, and `phpvm_deactivate` (now 14 tests total).
 
-## [v1.6.0](https://github.com/Thavarshan/phpvm/compare/1.5.0...1.6.0) - 2025-09-15
+## [v1.6.0](https://github.com/Thavarshan/phpvm/compare/1.5.0...1.6.0) - 2026-01-15
 
 ### Added
 
@@ -468,7 +486,7 @@
   - SC2128 (incorrect array handling)
 - Fixed potential issues with word splitting and globbing by ensuring proper quoting of variables in command calls.
 
-## [v1.0.0](https://github.com/Thavarshan/phpvm/compare/0.0.1...1.0.0) - 2025-02-04
+## [v1.0.0](https://github.com/Thavarshan/phpvm/compare/0.0.1...1.0.0) - 2025-02-08
 
 ### Added
 
@@ -484,6 +502,6 @@
 - Prevented terminal crashes due to incorrect sourcing in shell startup scripts.
 - Improved handling of missing PHP versions.
 
-## [v0.0.1](https://github.com/Thavarshan/phpvm/compare/0.0.0...0.0.1) - 2024-10-05
+## [v0.0.1](https://github.com/Thavarshan/phpvm/commits/0.0.1) - 2024-10-06
 
 Initial release for public testing and feedback.

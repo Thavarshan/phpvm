@@ -14,7 +14,7 @@
 
 ```sh
 $ phpvm version
-phpvm version 1.14.0
+phpvm version 1.15.0
 
 PHP Version Manager for macOS and Linux
 Author: Jerome Thayananthajothy <tjthavarshan@gmail.com>
@@ -49,7 +49,10 @@ PHP 8.1.13
 - **Auto-set `default` alias** on first `phpvm install` (matches nvm behaviour).
 - Alias management for versions (`phpvm alias`, `phpvm unalias`).
 - Built-in version shortcuts: `latest`, `stable`, and user-defined aliases.
-- **Bash tab completion** — context-aware completions for commands, versions, and aliases (auto-loaded on source).
+- **Bash and Zsh tab completion** — context-aware completions for commands, installed versions, and aliases (auto-loaded on source).
+- **Filter installed versions** with `phpvm ls 8`, `phpvm ls 8.2`, or `phpvm ls default`.
+- **Carry extensions to a new version** with `phpvm install 8.4 --reinstall-extensions-from=8.3` or `phpvm reinstall-extensions 8.3 8.4` (like nvm's `--reinstall-packages-from`).
+- **Optional Composer auto-switching** — set `PHPVM_AUTO_USE_COMPOSER=true` to switch on `cd` based on `composer.json`.
 - **`--no-use` flag** for sourcing without auto-switch or cd hook registration (`source phpvm.sh --no-use`).
 - **Unload phpvm** from the current shell session (`phpvm unload`).
 - Cache management: inspect (`phpvm cache dir`) and clear (`phpvm cache clear`).
@@ -121,7 +124,9 @@ If the installation was successful, it should output the path to `phpvm`.
 | `phpvm unload`                             | Remove phpvm from the current shell session                               |
 | `phpvm system`                             | Switch to system/Homebrew default PHP                                     |
 | `phpvm auto`                               | Auto-switch based on `.phpvmrc` file                                      |
-| `phpvm list` or `phpvm ls`                 | List all installed PHP versions                                           |
+| `phpvm list [pattern]` or `phpvm ls`       | List installed PHP versions, optionally filtered (`8`, `8.2`, an alias)   |
+| `phpvm reinstall-extensions <from> [to]`   | Install the extensions `<from>` loads into `[to]` (default: active)       |
+| `phpvm install <ver> --reinstall-extensions-from=<from>` | Install a version, then its extensions from `<from>` |
 | `phpvm ls-remote [pattern]`                | List available remote PHP versions                                        |
 | `phpvm install latest-remote`               | Install the latest remote PHP version available                          |
 | `phpvm self-update [--force]`               | Update phpvm to the latest stable release (checksum-verified)            |
@@ -291,7 +296,15 @@ $ phpvm resolve
 
 Supported constraint syntax: `^8.1`, `~8.2`, `~8.2.0`, `>=8.1`, `>8.1`, `<=8.3`, `<8.4`, `8.2.*`, `8.1 - 8.3`, exact versions such as `8.2.12`, AND (space or comma) and OR (`||`). `!=` clauses and stability flags such as `@dev` are ignored. A version matches when any of its patch releases would satisfy the constraint.
 
-If no installed version matches, `phpvm use` exits with code `4`; if no available version matches, `phpvm install` exits with code `3`. Requirements that use unsupported characters are ignored with a warning, and `phpvm use` falls back to the `default` alias. Automatic switching on `cd` and `phpvm auto` continue to use `.phpvmrc` only.
+If no installed version matches, `phpvm use` exits with code `4`; if no available version matches, `phpvm install` exits with code `3`. Requirements that use unsupported characters are ignored with a warning, and `phpvm use` falls back to the `default` alias.
+
+By default, automatic switching on `cd`, at shell startup, and with `phpvm auto` reads `.phpvmrc` only, so Composer projects don't switch PHP unexpectedly. To switch automatically on `composer.json` requirements as well, opt in before sourcing phpvm:
+
+```sh
+export PHPVM_AUTO_USE_COMPOSER=true
+```
+
+Automatic switching then uses the same nearest-pin rules as `phpvm use` and selects the newest installed version that satisfies the requirement.
 
 ### Listing Installed Versions
 
@@ -312,6 +325,34 @@ Installed PHP versions:
 
 Active version: 8.2
 ```
+
+Pass a pattern to filter the list, like `nvm ls <version>`. Patterns match whole version components, so `8.2` does not match `8.20`. Aliases filter by the version they point to, and `system` shows only the system entry:
+
+```sh
+phpvm ls 8          # every installed 8.x version
+phpvm ls 8.2        # just 8.2
+phpvm ls default    # the version the default alias points to
+```
+
+If nothing matches, `phpvm ls` exits with code `3`.
+
+### Reinstalling Extensions from Another Version
+
+When you move to a new PHP version, phpvm can install the extensions your current version uses, like nvm's `--reinstall-packages-from`:
+
+```sh
+# Install PHP 8.4, then the extensions PHP 8.3 loads that 8.4 lacks
+phpvm install 8.4 --reinstall-extensions-from=8.3
+
+# Same for versions that are already installed (target defaults to the active version)
+phpvm reinstall-extensions 8.3 8.4
+```
+
+phpvm compares `php -m` for both versions to find the missing extensions, then installs them:
+
+- **apt (Ubuntu/Debian):** installs the matching `phpX.Y-<extension>` packages, mapping extensions that share a package (for example `pdo_mysql` and `mysqli` → `phpX.Y-mysql`). Extensions without a package are listed for manual installation, and the command exits with code `3`.
+- **Homebrew:** installs each missing extension with the target version's `pecl`.
+- **dnf, yum, pacman:** these manage one PHP version at a time, so phpvm lists the missing extensions for you to install and exits non-zero.
 
 ### Managing Aliases
 
@@ -465,14 +506,18 @@ source ~/.phpvm/phpvm.sh
 
 ### Tab Completion
 
-phpvm includes built-in bash tab completion that is automatically loaded when phpvm is sourced. It provides context-aware completions for:
+phpvm includes tab completion for Bash and Zsh that is automatically loaded when phpvm is sourced. It provides context-aware completions for:
 
 - All phpvm commands
-- Installed PHP versions (for `use`, `uninstall`, `which`, `exec`, `run`, `resolve`)
+- Installed PHP versions and aliases (for `use`, `uninstall`, `which`, `exec`, `run`, `resolve`, `ls`, `reinstall-extensions`, and `--reinstall-extensions-from`)
 - Alias names (for `unalias`)
-- Cache subcommands (`dir`, `clear`)
+- Options (`install --reinstall-extensions-from`, `self-update --force`) and cache subcommands (`dir`, `clear`)
 
-No additional setup is required — completions are loaded from `$PHPVM_DIR/completions/phpvm.bash`.
+Completions are loaded from `$PHPVM_DIR/completions/phpvm.bash`. Bash needs no setup. In Zsh, phpvm registers completion through `bashcompinit`, as nvm does. This needs Zsh's completion system to be loaded before phpvm is sourced; frameworks such as Oh My Zsh already do this. Otherwise add this above the phpvm lines in `~/.zshrc`:
+
+```sh
+autoload -Uz compinit && compinit
+```
 
 ### Sourcing with `--no-use`
 
@@ -519,6 +564,7 @@ fi
 | `PHPVM_AUTO_USE`          | `true`     | Enable automatic `.phpvmrc` detection when sourced                                       |
 | `PHPVM_PHPVMRC_MAX_DEPTH` | `25`       | Max parent directories to traverse when searching for `.phpvmrc`                         |
 | `PHPVM_APT_INSTALL_FPM`   | `false`    | On apt systems, also install `phpX.Y-fpm` (which starts a php-fpm service)               |
+| `PHPVM_AUTO_USE_COMPOSER` | `false`    | Let automatic switching (startup, `cd`, `phpvm auto`) also use `composer.json`           |
 | `PHPVM_DEBUG`             | `false`    | Enable debug logging with timestamps                                                     |
 | `NO_COLOR`                | _(unset)_  | Disable color output ([no-color.org](https://no-color.org/))                             |
 | `PHPVM_LOG_TIMESTAMPS`    | `false`    | Always show timestamps in log output                                                     |

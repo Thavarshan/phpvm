@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Version tag to prepare (for example 1.14.0)
+        description: Version tag to prepare (for example 1.15.0)
         required: true
         type: string
 
