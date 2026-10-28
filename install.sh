@@ -23,7 +23,7 @@
     PHPVM_DIR="${PHPVM_DIR:-${XDG_CONFIG_HOME:+$XDG_CONFIG_HOME/phpvm}}"
     PHPVM_DIR="${PHPVM_DIR:-$HOME/.phpvm}"
     PHPVM_SCRIPT="$PHPVM_DIR/phpvm.sh"
-    PHPVM_RELEASE_VERSION="1.14.0"
+    PHPVM_RELEASE_VERSION="1.15.0"
     GITHUB_RAW_BASE="${PHPVM_INSTALL_SOURCE_BASE:-https://raw.githubusercontent.com/Thavarshan/phpvm/$PHPVM_RELEASE_VERSION}"
 
     phpvm_install_dir() {

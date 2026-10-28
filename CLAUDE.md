@@ -52,6 +52,7 @@ The tool detects and works with multiple package managers:
 - Without a version, `use`, `install`, `resolve`, `exec` and `run` read the nearest project pin (`phpvm_read_project_version`)
 - Each directory is checked for `.phpvmrc`, then for `config.platform.php` / `require.php` in `composer.json`
 - Composer constraints are matched in portable awk (`phpvm_filter_by_constraint`); keep it compatible with BSD awk, mawk and gawk
+- Automatic switching (startup, cd hook, `phpvm auto`) reads `.phpvmrc` only unless `PHPVM_AUTO_USE_COMPOSER=true` (`phpvm_auto_project_version`)
 
 ### Testing Framework
 - BATS (Bash Automated Testing System) test suite in `tests/` directory
@@ -156,7 +157,7 @@ phpvm/
 ├── install-bats.sh   # BATS installation script
 ├── install.sh        # Main installation script
 ├── phpvm.sh          # Core functionality (~4,500 lines)
-├── tests/            # BATS suites (01–08) and the real-PHP session smoke test
+├── tests/            # BATS suites (01–10) and the real-PHP session smoke test
 ├── versions/         # Placeholder (session links live in $PHPVM_DIR/versions)
 └── .github/          # GitHub workflows and templates
     └── workflows/
