@@ -12,10 +12,10 @@ load test_helper
     local home_dir="$TEST_DIR/home"
     local install_dir="$TEST_DIR/install dir"
     local server_log="$TEST_DIR/install-http.log"
-    mkdir -p "$web_root/1.13.0/completions" "$home_dir"
+    mkdir -p "$web_root/1.14.0/completions" "$home_dir"
     touch "$home_dir/.bashrc"
-    cp "$BATS_TEST_DIRNAME/../phpvm.sh" "$web_root/1.13.0/phpvm.sh"
-    cp "$BATS_TEST_DIRNAME/../completions/phpvm.bash" "$web_root/1.13.0/completions/phpvm.bash"
+    cp "$BATS_TEST_DIRNAME/../phpvm.sh" "$web_root/1.14.0/phpvm.sh"
+    cp "$BATS_TEST_DIRNAME/../completions/phpvm.bash" "$web_root/1.14.0/completions/phpvm.bash"
 
     python3 - "$web_root" << 'PY' > "$server_log" 2>&1 &
 import http.server
@@ -40,12 +40,12 @@ PY
     fi
     trap 'kill "$server_pid" >/dev/null 2>&1 || true; wait "$server_pid" 2>/dev/null || true' RETURN
 
-    run env PHPVM_DIR="$install_dir" HOME="$home_dir" SHELL=/bin/bash PROFILE= PHPVM_INSTALL_SOURCE_BASE="http://127.0.0.1:$port/1.13.0" sh "$BATS_TEST_DIRNAME/../install.sh"
+    run env PHPVM_DIR="$install_dir" HOME="$home_dir" SHELL=/bin/bash PROFILE= PHPVM_INSTALL_SOURCE_BASE="http://127.0.0.1:$port/1.14.0" sh "$BATS_TEST_DIRNAME/../install.sh"
     [ "$status" -eq 0 ]
     [ -x "$install_dir/phpvm.sh" ]
     [ -L "$install_dir/bin/phpvm" ]
     [ -s "$install_dir/completions/phpvm.bash" ]
     grep -q 'PHPVM_DIR' "$home_dir/.bashrc"
-    run env PHPVM_DIR="$install_dir" HOME="$home_dir" SHELL=/bin/bash PROFILE= PHPVM_INSTALL_SOURCE_BASE="file://$web_root/1.13.0" bash "$BATS_TEST_DIRNAME/../install.sh"
+    run env PHPVM_DIR="$install_dir" HOME="$home_dir" SHELL=/bin/bash PROFILE= PHPVM_INSTALL_SOURCE_BASE="file://$web_root/1.14.0" bash "$BATS_TEST_DIRNAME/../install.sh"
     [ "$status" -eq 0 ]
 }

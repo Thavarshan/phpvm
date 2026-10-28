@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+## [v1.14.0](https://github.com/Thavarshan/phpvm/compare/1.13.0...1.14.0) - 2026-10-28
+
+### Added
+
+- **Composer-aware version detection:** Without a version argument, `phpvm use`, `phpvm install`, and `phpvm resolve` read the nearest project pin. Each directory is checked for `.phpvmrc`, then for the PHP requirement in `composer.json`; `config.platform.php` takes precedence over `require.php`.
+- **Composer constraint matching:** Requirements such as `^8.1`, `~8.2.0`, `>=8.1 <8.4`, `8.2.*`, `8.1 - 8.3`, and `^7.4 || ^8.2` select the newest matching installed version for `use` and `resolve`, and the newest matching available version for `install`.
+- **`phpvm resolve` without arguments:** Prints the installed version that satisfies the current project's pin.
+
+### Fixed
+
+- **`latest` and `stable` in Zsh (#24):** Installed-version discovery no longer overwrites `PATH` through Zsh's `path` array, and an empty Cellar no longer aborts the lookup.
+- **Test isolation (#32):** Each BATS test keeps its mock PHP installations in its own directory instead of a shared `/tmp/opt/homebrew/Cellar`.
+
+### Changed
+
+- **No-pin messages:** `use` and `install` now mention `composer.json` when no project pin is found.
+
 ## [v1.13.0](https://github.com/Thavarshan/phpvm/compare/1.12.2...1.13.0) - 2026-09-29
 
 ### Added

@@ -12,6 +12,8 @@ setup() {
     export PHPVM_VERSIONS_DIR="$PHPVM_DIR/versions"
     export PHPVM_ACTIVE_VERSION_FILE="$PHPVM_DIR/active_version"
     export PHPVM_CURRENT_SYMLINK="$PHPVM_DIR/current"
+    # Keep mock PHP installations inside this test's directory
+    export TEST_PREFIX="$TEST_DIR/prefix"
 
     # Source phpvm
     source "$BATS_TEST_DIRNAME/../phpvm.sh"
