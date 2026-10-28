@@ -1276,7 +1276,15 @@ phpvm_session_dispatch() {
         ;;
     auto)
         local version
-        version=$(phpvm_auto_project_version) || return "$PHPVM_EXIT_NOT_FOUND"
+        local result
+        version=$(phpvm_auto_project_version)
+        result=$?
+        # Only "no project pin" maps to not-found; keep resolution failures (4)
+        if [ "$result" -eq 1 ]; then
+            return "$PHPVM_EXIT_NOT_FOUND"
+        elif [ "$result" -ne 0 ]; then
+            return "$result"
+        fi
         phpvm_session_use "$version"
         ;;
     current)
@@ -4117,15 +4125,20 @@ phpvm_apt_extension_package() {
     esac
 }
 
-# Install extensions for an apt PHP version, skipping packages apt cannot find
-# Usage: phpvm_reinstall_extensions_apt <X.Y> <extension>...
+# Install extensions for an apt PHP version, skipping packages apt cannot find,
+# then enable any that are installed but disabled (phpdismod) and verify PHP
+# loads them
+# Usage: phpvm_reinstall_extensions_apt <X.Y> <target-php-binary> <extension>...
 phpvm_reinstall_extensions_apt() {
     local version="$1"
+    local php="$2"
     local extension
     local package
+    local loaded
     local packages=()
     local unavailable=()
-    shift
+    local not_loaded=()
+    shift 2
 
     for extension in "$@"; do
         package="php${version}-$(phpvm_apt_extension_package "$extension")"
@@ -4146,9 +4159,39 @@ phpvm_reinstall_extensions_apt() {
             return "$PHPVM_EXIT_ERROR"
         fi
     fi
+
+    # apt-get is a no-op for packages that are installed but disabled, so enable
+    # those explicitly and report success only for extensions PHP now loads
+    loaded=$(phpvm_php_extensions "$php")
+    for extension in "$@"; do
+        case " ${unavailable[*]} " in
+        *" $extension "*) continue ;;
+        esac
+        printf '%s\n' "$loaded" | command grep -qxF "$extension" && continue
+        if command_exists phpenmod; then
+            run_with_sudo phpenmod -v "$version" "$extension" > /dev/null 2>&1 || true
+        fi
+    done
+    loaded=$(phpvm_php_extensions "$php")
+    for extension in "$@"; do
+        case " ${unavailable[*]} " in
+        *" $extension "*) continue ;;
+        esac
+        printf '%s\n' "$loaded" | command grep -qxF "$extension" || not_loaded+=("$extension")
+    done
+
     if [ "${#unavailable[@]}" -gt 0 ]; then
         phpvm_warn "No apt package found for: ${unavailable[*]}. Install these for PHP $version manually."
+    fi
+    if [ "${#not_loaded[@]}" -gt 0 ]; then
+        phpvm_warn "Installed but not loaded by PHP $version: ${not_loaded[*]}"
+        phpvm_warn "Enable them with: sudo phpenmod -v $version ${not_loaded[*]}"
+    fi
+    if [ "${#unavailable[@]}" -gt 0 ]; then
         return "$PHPVM_EXIT_NOT_FOUND"
+    fi
+    if [ "${#not_loaded[@]}" -gt 0 ]; then
+        return "$PHPVM_EXIT_ERROR"
     fi
     return "$PHPVM_EXIT_SUCCESS"
 }
@@ -4183,7 +4226,10 @@ phpvm_reinstall_extensions_pecl() {
         fi
     done
 
-    # Enable built extensions PHP does not load yet through its ini scan directory
+    # Enable built extensions PHP does not load yet through its ini scan directory.
+    # phpvm writes its own phpvm-<name>.ini loader so existing ini files, and
+    # any settings in them, are never modified; PHP applies those settings
+    # whichever file loads the extension.
     scan_dir=$("$php" -r 'echo PHP_CONFIG_FILE_SCAN_DIR;' 2> /dev/null) || scan_dir=""
     case "$scan_dir" in
     /*) ;;
@@ -4200,7 +4246,7 @@ phpvm_reinstall_extensions_pecl() {
             xdebug | opcache) directive=zend_extension ;;
             *) directive=extension ;;
             esac
-            if printf '%s=%s\n' "$directive" "$extension" > "$scan_dir/ext-$extension.ini"; then
+            if printf '%s=%s\n' "$directive" "$extension" > "$scan_dir/phpvm-$extension.ini"; then
                 enabled+=("$extension")
             fi
         fi
@@ -4286,7 +4332,7 @@ phpvm_reinstall_extensions() {
 
     case "$PKG_MANAGER" in
     apt)
-        phpvm_reinstall_extensions_apt "$to" "${extensions[@]}"
+        phpvm_reinstall_extensions_apt "$to" "$to_binary" "${extensions[@]}"
         ;;
     brew)
         phpvm_reinstall_extensions_pecl "$to_binary" "${extensions[@]}"
