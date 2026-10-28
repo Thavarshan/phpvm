@@ -735,6 +735,10 @@ get_php_package_name() {
         # Use helper to resolve actual installed formula
         if formula=$(brew_resolve_formula_for_version "$normalized_version"); then
             echo "$formula"
+        elif ! brew info "php@${normalized_version}" > /dev/null 2>&1 &&
+            [ "$(brew_php_formula_version 2> /dev/null)" = "$normalized_version" ]; then
+            # The newest PHP is only published as the unversioned formula
+            echo "php"
         else
             # Fallback to versioned format if not installed yet
             echo "php@${normalized_version}"
@@ -1380,11 +1384,11 @@ phpvm_get_remote_versions() {
             remote_versions=$(
                 brew formulae 2> /dev/null | command grep -E '^php(@[0-9]+\.[0-9]+)?$' | while IFS= read -r formula; do
                     if [ "$formula" = "php" ]; then
-                        printf '%s\n' "$(brew_php_major_minor 2> /dev/null || printf '%s' 'latest')"
+                        printf '%s\n' "$(brew_php_formula_version 2> /dev/null || printf '%s' 'latest')"
                     else
                         printf '%s\n' "${formula#php@}"
                     fi
-                done | command sort -t. -k1,1n -k2,2n
+                done | command sort -t. -k1,1n -k2,2n -u
             )
             ;;
         apt)
@@ -1621,6 +1625,23 @@ brew_php_major_minor() {
     local bin="${HOMEBREW_PREFIX}/opt/php/bin/php"
     [ -x "$bin" ] || return 1
     "$bin" -r 'echo PHP_MAJOR_VERSION,".",PHP_MINOR_VERSION;' 2> /dev/null
+}
+
+# Get major.minor of the unversioned "php" formula from Homebrew metadata, so it
+# is known before the formula is installed; falls back to the installed binary
+brew_php_formula_version() {
+    local version
+
+    version=$(brew info --json=v1 php 2> /dev/null |
+        command grep -oE '"stable": *"[0-9]+\.[0-9]+[0-9.]*"' |
+        command head -1 |
+        command sed -E 's/.*"([0-9][0-9.]*)"$/\1/' |
+        command cut -d. -f1,2)
+    if [ -z "$version" ]; then
+        version=$(brew_php_major_minor 2> /dev/null) || return 1
+    fi
+    [ -n "$version" ] || return 1
+    printf '%s\n' "$version"
 }
 
 # Resolve which brew formula provides a given PHP version

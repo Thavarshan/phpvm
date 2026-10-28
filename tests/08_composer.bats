@@ -179,6 +179,41 @@ EOF
     phpvm_test_php_installed 8.3
 }
 
+@test "Homebrew's unversioned formula counts as an installable remote version" {
+    # Fresh Homebrew: nothing installed; PHP 8.5 exists only as the "php" formula
+    mkdir -p "$TEST_DIR/stub"
+    cat > "$TEST_DIR/stub/brew" << 'EOF'
+#!/bin/sh
+printf '%s\n' "$*" >> "$BREW_LOG"
+case "$*" in
+"formulae") printf 'php\nphp@8.3\nphp@8.4\nphpunit\n' ;;
+"info --json=v1 php") printf '[{"name":"php","versions":{"stable":"8.5.1","head":"HEAD","bottle":true},"bottle":{"stable":{"rebuild":0}}}]\n' ;;
+"info php" | "info php@8.3" | "info php@8.4") exit 0 ;;
+"install "*) exit 0 ;;
+*) exit 1 ;;
+esac
+EOF
+    chmod +x "$TEST_DIR/stub/brew"
+    export BREW_LOG="$TEST_DIR/brew.log" PATH="$TEST_DIR/stub:$PATH"
+    PHPVM_TEST_MODE=false
+    PKG_MANAGER=brew
+    HOMEBREW_PREFIX="$TEST_DIR/brew"
+
+    [ "$(phpvm_get_remote_versions | paste -s -d ' ' -)" = "8.3 8.4 8.5" ]
+    [ "$(get_php_package_name 8.5)" = "php" ]
+    [ "$(get_php_package_name 8.4)" = "php@8.4" ]
+
+    write_composer "$TEST_DIR/app" '{"require":{"php":"^8.5"}}'
+    cd "$TEST_DIR/app"
+    run phpvm_read_project_version remote
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "8.5" ]
+
+    run install_php 8.5
+    [ "$status" -eq 0 ]
+    grep -qx 'install php' "$BREW_LOG"
+}
+
 @test "install without arguments fails when no available version matches" {
     write_composer "$TEST_DIR/app" '{"require":{"php":"^9.0"}}'
     run bash -c 'cd "$1" && bash "$2" install' _ "$TEST_DIR/app" "$BATS_TEST_DIRNAME/../phpvm.sh"
