@@ -5,7 +5,17 @@ load test_helper
 
 # Print the candidates that satisfy a constraint, space-separated
 matching() {
-    printf '%s\n' 7.4 8.0 8.1 8.2 8.3 8.4 9.0 | phpvm_filter_by_constraint "$1" | tr '\n' ' ' | sed 's/ $//'
+    printf '%s\n' 7.4 8.0 8.1 8.2 8.3 8.4 9.0 | phpvm_filter_by_constraint "$1" | paste -s -d ' ' -
+}
+
+# Fail with the actual matches when they differ from the expected list
+assert_matches() {
+    local actual
+    actual=$(matching "$1")
+    if [ "$actual" != "$2" ]; then
+        printf "constraint '%s': expected '%s', got '%s'\n" "$1" "$2" "$actual" >&2
+        return 1
+    fi
 }
 
 write_composer() {
@@ -16,32 +26,32 @@ write_composer() {
 # --- constraint matching ---
 
 @test "caret and tilde constraints follow Composer semantics" {
-    [ "$(matching '^8.1')" = "8.1 8.2 8.3 8.4" ]
-    [ "$(matching '~8.2')" = "8.2 8.3 8.4" ]
-    [ "$(matching '~8.2.0')" = "8.2" ]
+    assert_matches '^8.1' "8.1 8.2 8.3 8.4"
+    assert_matches '~8.2' "8.2 8.3 8.4"
+    assert_matches '~8.2.0' "8.2"
 }
 
 @test "comparison constraints combine with spaces or commas" {
-    [ "$(matching '>=8.1 <8.3')" = "8.1 8.2" ]
-    [ "$(matching '>=8.1,<8.3')" = "8.1 8.2" ]
-    [ "$(matching '>= 8.1, < 8.3')" = "8.1 8.2" ]
-    [ "$(matching '<=8.1')" = "7.4 8.0 8.1" ]
-    [ "$(matching '>=8.4')" = "8.4 9.0" ]
+    assert_matches '>=8.1 <8.3' "8.1 8.2"
+    assert_matches '>=8.1,<8.3' "8.1 8.2"
+    assert_matches '>= 8.1, < 8.3' "8.1 8.2"
+    assert_matches '<=8.1' "7.4 8.0 8.1"
+    assert_matches '>=8.4' "8.4 9.0"
 }
 
 @test "wildcards, hyphen ranges and exact versions match whole minors" {
-    [ "$(matching '8.2.*')" = "8.2" ]
-    [ "$(matching '8.*')" = "8.0 8.1 8.2 8.3 8.4" ]
-    [ "$(matching '8.1 - 8.2')" = "8.1 8.2" ]
-    [ "$(matching '8.2.12')" = "8.2" ]
-    [ "$(matching 'v8.2')" = "8.2" ]
+    assert_matches '8.2.*' "8.2"
+    assert_matches '8.*' "8.0 8.1 8.2 8.3 8.4"
+    assert_matches '8.1 - 8.2' "8.1 8.2"
+    assert_matches '8.2.12' "8.2"
+    assert_matches 'v8.2' "8.2"
 }
 
 @test "alternatives and stability flags are supported" {
-    [ "$(matching '^7.4 || ^8.3')" = "7.4 8.3 8.4" ]
-    [ "$(matching '^7.4|^8.3')" = "7.4 8.3 8.4" ]
-    [ "$(matching '^8.3@dev')" = "8.3 8.4" ]
-    [ -z "$(matching '^8.5')" ]
+    assert_matches '^7.4 || ^8.3' "7.4 8.3 8.4"
+    assert_matches '^7.4|^8.3' "7.4 8.3 8.4"
+    assert_matches '^8.3@dev' "8.3 8.4"
+    assert_matches '^8.5' ""
 }
 
 @test "unusable constraints are reported" {
