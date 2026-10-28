@@ -4153,14 +4153,21 @@ phpvm_reinstall_extensions_apt() {
     return "$PHPVM_EXIT_SUCCESS"
 }
 
-# Install extensions with the target PHP version's pecl (Homebrew)
+# Install extensions with the target PHP version's pecl (Homebrew), then make
+# sure PHP loads them: pecl only builds the shared library
 # Usage: phpvm_reinstall_extensions_pecl <target-php-binary> <extension>...
 phpvm_reinstall_extensions_pecl() {
+    local php="$1"
     local pecl
     local extension
+    local scan_dir
+    local loaded
+    local directive
     local failed=()
+    local enabled=()
+    local not_loaded=()
 
-    pecl="$(dirname "$1")/pecl"
+    pecl="$(dirname "$php")/pecl"
     shift
     if [ ! -x "$pecl" ]; then
         phpvm_err "pecl not found next to the target PHP binary ($pecl)."
@@ -4176,8 +4183,49 @@ phpvm_reinstall_extensions_pecl() {
         fi
     done
 
+    # Enable built extensions PHP does not load yet through its ini scan directory
+    scan_dir=$("$php" -r 'echo PHP_CONFIG_FILE_SCAN_DIR;' 2> /dev/null) || scan_dir=""
+    case "$scan_dir" in
+    /*) ;;
+    *) scan_dir="" ;;
+    esac
+    loaded=$(phpvm_php_extensions "$php")
+    for extension in "$@"; do
+        case " ${failed[*]} " in
+        *" $extension "*) continue ;;
+        esac
+        printf '%s\n' "$loaded" | command grep -qxF "$extension" && continue
+        if [ -n "$scan_dir" ] && [ -d "$scan_dir" ] && [ -w "$scan_dir" ]; then
+            case "$extension" in
+            xdebug | opcache) directive=zend_extension ;;
+            *) directive=extension ;;
+            esac
+            if printf '%s=%s\n' "$directive" "$extension" > "$scan_dir/ext-$extension.ini"; then
+                enabled+=("$extension")
+            fi
+        fi
+    done
+
+    # Report success only for extensions PHP now actually loads
+    loaded=$(phpvm_php_extensions "$php")
+    for extension in "$@"; do
+        case " ${failed[*]} " in
+        *" $extension "*) continue ;;
+        esac
+        printf '%s\n' "$loaded" | command grep -qxF "$extension" || not_loaded+=("$extension")
+    done
+
+    if [ "${#enabled[@]}" -gt 0 ]; then
+        phpvm_echo "Enabled in $scan_dir: ${enabled[*]}"
+    fi
     if [ "${#failed[@]}" -gt 0 ]; then
         phpvm_warn "pecl could not install: ${failed[*]}"
+    fi
+    if [ "${#not_loaded[@]}" -gt 0 ]; then
+        phpvm_warn "Installed but not loaded by PHP: ${not_loaded[*]}"
+        phpvm_warn "Add extension=<name> for each to the php.ini that '$php --ini' reports."
+    fi
+    if [ "${#failed[@]}" -gt 0 ] || [ "${#not_loaded[@]}" -gt 0 ]; then
         return "$PHPVM_EXIT_ERROR"
     fi
     return "$PHPVM_EXIT_SUCCESS"

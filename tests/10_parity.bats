@@ -273,6 +273,62 @@ printf "%s:\n  Installed: (none)\n  Candidate: %s\n" "$2" "$c"'
     [[ "$output" =~ "pecl could not install: xdebug" ]]
 }
 
+# A target PHP whose module list reflects the extension= lines in its scan directory
+fake_php_with_scan_dir() {
+    mkdir -p "$(dirname "$1")"
+    cat > "$1" << 'EOF'
+#!/bin/sh
+case "$1" in
+-r)
+    case "$2" in
+    *SCAN_DIR*) printf '%s' "$PHP_SCAN_DIR" ;;
+    *) printf '8.3\n' ;;
+    esac
+    ;;
+-m)
+    printf '[PHP Modules]\nCore\n'
+    cat "$PHP_SCAN_DIR"/*.ini 2> /dev/null | sed -n 's/^.*extension=//p'
+    printf '\n[Zend Modules]\n'
+    ;;
+esac
+EOF
+    chmod +x "$1"
+}
+
+@test "Homebrew reinstall enables pecl-built extensions so PHP loads them (#40)" {
+    fake_php "$TEST_DIR/8.2/bin/php" 8.2 Core redis xdebug
+    fake_php_with_scan_dir "$TEST_DIR/8.3/bin/php"
+    printf '#!/bin/sh\nexit 0\n' > "$TEST_DIR/8.3/bin/pecl"
+    chmod +x "$TEST_DIR/8.3/bin/pecl"
+    export PHP_SCAN_DIR="$TEST_DIR/conf.d"
+    mkdir -p "$PHP_SCAN_DIR"
+    PHPVM_TEST_MODE=false
+    PKG_MANAGER=brew
+    get_php_binary_path() { printf '%s/%s/bin/php\n' "$TEST_DIR" "$1"; }
+
+    run phpvm_reinstall_extensions 8.2 8.3
+    [ "$status" -eq 0 ]
+    [ "$(cat "$PHP_SCAN_DIR/ext-redis.ini")" = "extension=redis" ]
+    [ "$(cat "$PHP_SCAN_DIR/ext-xdebug.ini")" = "zend_extension=xdebug" ]
+    [[ "$output" =~ "Enabled in $PHP_SCAN_DIR: redis xdebug" ]]
+}
+
+@test "Homebrew reinstall reports extensions PHP still does not load (#40)" {
+    fake_php "$TEST_DIR/8.2/bin/php" 8.2 Core redis
+    fake_php_with_scan_dir "$TEST_DIR/8.3/bin/php"
+    printf '#!/bin/sh\nexit 0\n' > "$TEST_DIR/8.3/bin/pecl"
+    chmod +x "$TEST_DIR/8.3/bin/pecl"
+    export PHP_SCAN_DIR=""
+    PHPVM_TEST_MODE=false
+    PKG_MANAGER=brew
+    get_php_binary_path() { printf '%s/%s/bin/php\n' "$TEST_DIR" "$1"; }
+
+    run phpvm_reinstall_extensions 8.2 8.3
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Installed but not loaded by PHP: redis" ]]
+    [[ ! "$output" =~ "Enabled in" ]]
+}
+
 @test "reinstall lists extensions where it cannot install them and validates versions (#40)" {
     fake_php "$TEST_DIR/8.2/php" 8.2 Core redis
     fake_php "$TEST_DIR/8.3/php" 8.3 Core
