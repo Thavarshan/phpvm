@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [v1.15.1](https://github.com/Thavarshan/phpvm/compare/1.15.0...1.15.1) - 2026-10-29
+
+### Fixed
+
+- **Already installed PECL extensions (#44):** Homebrew extension migration enables shared libraries already present in the target PHP's extension directory without rebuilding them. A failed PECL install that leaves the shared library in place also proceeds to loader creation, while success still requires PHP to load the extension.
+
 ## [v1.15.0](https://github.com/Thavarshan/phpvm/compare/1.14.0...1.15.0) - 2026-10-28
 
 ### Added

@@ -2,13 +2,13 @@
 
 # phpvm - A PHP Version Manager for macOS and Linux
 # Author: Jerome Thayananthajothy (tjthavarshan@gmail.com)
-# Version: 1.15.0
+# Version: 1.15.1
 #
 # Run the executable with Bash; source it in Bash or Zsh for shell-local commands.
 
 # shellcheck disable=SC2155  # Allow declare and assign on same line for better readability
 
-PHPVM_VERSION="1.15.0"
+PHPVM_VERSION="1.15.1"
 
 PHPVM_SWITCH_MODE="${PHPVM_SWITCH_MODE:-global}"
 export PHPVM_SWITCH_MODE
@@ -1148,6 +1148,7 @@ phpvm_session_strip_path() {
     local first=true
     if [ -n "${ZSH_VERSION:-}" ]; then
         local -a path_entries
+        # shellcheck disable=SC2154 # Zsh provides path as an array tied to PATH.
         path_entries=("${path[@]}")
         for entry in "${path_entries[@]}"; do
             if [ -n "$remove" ] && [ "$entry" = "$remove" ]; then continue; fi
@@ -4202,6 +4203,7 @@ phpvm_reinstall_extensions_apt() {
 phpvm_reinstall_extensions_pecl() {
     local php="$1"
     local pecl
+    local extension_dir
     local extension
     local scan_dir
     local loaded
@@ -4218,11 +4220,22 @@ phpvm_reinstall_extensions_pecl() {
         return "$PHPVM_EXIT_NOT_FOUND"
     fi
 
+    extension_dir=$("$php" -r 'echo ini_get("extension_dir");' 2> /dev/null) || extension_dir=""
+    case "$extension_dir" in
+    /*) ;;
+    *) extension_dir="" ;;
+    esac
+
     for extension in "$@"; do
+        if [ -n "$extension_dir" ] && [ -f "$extension_dir/$extension.so" ]; then
+            continue
+        fi
         phpvm_echo "Installing $extension with pecl..."
         # Accept pecl's default answers to build configuration prompts
         if ! printf '\n\n\n\n\n\n\n\n' | "$pecl" install "$extension"; then
-            failed+=("$extension")
+            if [ -z "$extension_dir" ] || [ ! -f "$extension_dir/$extension.so" ]; then
+                failed+=("$extension")
+            fi
         fi
     done
 

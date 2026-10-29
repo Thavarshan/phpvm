@@ -385,6 +385,7 @@ case "$1" in
 -r)
     case "$2" in
     *SCAN_DIR*) printf '%s' "$PHP_SCAN_DIR" ;;
+    *extension_dir*) printf '%s' "$PHP_EXTENSION_DIR" ;;
     *) printf '8.3\n' ;;
     esac
     ;;
@@ -414,6 +415,45 @@ EOF
     [ "$(cat "$PHP_SCAN_DIR/phpvm-redis.ini")" = "extension=redis" ]
     [ "$(cat "$PHP_SCAN_DIR/phpvm-xdebug.ini")" = "zend_extension=xdebug" ]
     [[ "$output" =~ "Enabled in $PHP_SCAN_DIR: redis xdebug" ]]
+}
+
+@test "Homebrew reinstall enables existing libraries without invoking pecl (#44)" {
+    fake_php "$TEST_DIR/8.2/bin/php" 8.2 Core redis xdebug
+    fake_php_with_scan_dir "$TEST_DIR/8.3/bin/php"
+    export PHP_SCAN_DIR="$TEST_DIR/conf.d" PHP_EXTENSION_DIR="$TEST_DIR/extensions"
+    export PECL_LOG="$TEST_DIR/pecl.log"
+    mkdir -p "$PHP_SCAN_DIR" "$PHP_EXTENSION_DIR"
+    touch "$PHP_EXTENSION_DIR/redis.so" "$PHP_EXTENSION_DIR/xdebug.so"
+    printf '#!/bin/sh\nprintf "called\\n" >> "$PECL_LOG"\nexit 1\n' > "$TEST_DIR/8.3/bin/pecl"
+    chmod +x "$TEST_DIR/8.3/bin/pecl"
+    PHPVM_TEST_MODE=false
+    PKG_MANAGER=brew
+    get_php_binary_path() { printf '%s/%s/bin/php\n' "$TEST_DIR" "$1"; }
+
+    run phpvm_reinstall_extensions 8.2 8.3
+    [ "$status" -eq 0 ]
+    [ ! -e "$PECL_LOG" ]
+    [ "$(cat "$PHP_SCAN_DIR/phpvm-redis.ini")" = "extension=redis" ]
+    [ "$(cat "$PHP_SCAN_DIR/phpvm-xdebug.ini")" = "zend_extension=xdebug" ]
+}
+
+@test "Homebrew reinstall enables libraries left by a failed pecl install (#44)" {
+    fake_php "$TEST_DIR/8.2/bin/php" 8.2 Core redis xdebug
+    fake_php_with_scan_dir "$TEST_DIR/8.3/bin/php"
+    export PHP_SCAN_DIR="$TEST_DIR/conf.d" PHP_EXTENSION_DIR="$TEST_DIR/extensions"
+    mkdir -p "$PHP_SCAN_DIR" "$PHP_EXTENSION_DIR"
+    printf '#!/bin/sh\n[ "$2" = redis ] && touch "$PHP_EXTENSION_DIR/$2.so"\nexit 1\n' > "$TEST_DIR/8.3/bin/pecl"
+    chmod +x "$TEST_DIR/8.3/bin/pecl"
+    PHPVM_TEST_MODE=false
+    PKG_MANAGER=brew
+    get_php_binary_path() { printf '%s/%s/bin/php\n' "$TEST_DIR" "$1"; }
+
+    run phpvm_reinstall_extensions 8.2 8.3
+    [ "$status" -eq 1 ]
+    [ "$(cat "$PHP_SCAN_DIR/phpvm-redis.ini")" = "extension=redis" ]
+    [ ! -e "$PHP_SCAN_DIR/phpvm-xdebug.ini" ]
+    [[ "$output" =~ "pecl could not install: xdebug" ]]
+    [[ ! "$output" =~ "pecl could not install: redis" ]]
 }
 
 @test "Homebrew reinstall leaves existing extension ini settings untouched (#40)" {
