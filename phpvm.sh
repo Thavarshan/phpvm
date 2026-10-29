@@ -2,7 +2,7 @@
 
 # phpvm - A PHP Version Manager for macOS and Linux
 # Author: Jerome Thayananthajothy (tjthavarshan@gmail.com)
-# Version: 1.15.0
+# Version: 1.15.1
 #
 # Run the executable with Bash; source it in Bash or Zsh for shell-local commands.
 
