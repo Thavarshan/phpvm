@@ -14,7 +14,7 @@
 
 ```sh
 $ phpvm version
-phpvm version 1.15.0
+phpvm version 1.15.1
 
 PHP Version Manager for macOS and Linux
 Author: Jerome Thayananthajothy <tjthavarshan@gmail.com>
@@ -347,6 +347,9 @@ phpvm install 8.4 --reinstall-extensions-from=8.3
 # Same for versions that are already installed (target defaults to the active version)
 phpvm reinstall-extensions 8.3 8.4
 ```
+
+On Homebrew, extensions already built for the target PHP are enabled without rebuilding.
+Re-running the command can restore missing extension loaders.
 
 phpvm compares `php -m` for both versions to find the missing extensions, then installs them:
 
